@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import csv
 import io
@@ -143,6 +143,85 @@ def build_preview(question: str) -> dict:
     }
 
 
+
+
+def build_retrieval_conditions(query: str, rule_hits: list[dict]) -> dict:
+    top_rule = rule_hits[0] if rule_hits else {}
+    return {
+        "source": "llm_or_rule_grounded_planner",
+        "query_text": query,
+        "candidate_item_rule_id": top_rule.get("item_rule_id"),
+        "candidate_rule_type": top_rule.get("rule_type"),
+        "candidate_item_code": top_rule.get("item_code"),
+        "candidate_item_name": top_rule.get("item_name"),
+        "date_start": "2025-01-01",
+        "date_end": "2026-01-01",
+        "execution_mode": "confirm_then_readonly_database_search",
+        "requires_expert_confirmation": True,
+        "next_api": "/api/v1/query/confirm -> /api/v1/query/execute",
+    }
+def build_assistant_reply(message: str, history: list[dict] | None = None) -> dict:
+    query = message.strip()
+    if not query:
+        raise ValueError("message is required")
+
+    rule_hits = search_rules(query, limit=3)
+    policy_hits = search_policy(query, limit=3)
+    quick_hits = quick_search(ROOT, query, library="all", limit=5).get("results", [])
+    generated_conditions = build_retrieval_conditions(query, rule_hits)
+    evidence_graph = None
+    if rule_hits:
+        rule_item = RULE_ITEM_BY_ID.get(rule_hits[0].get("item_rule_id"))
+        if rule_item:
+            evidence_graph = build_rule_evidence_graph(ROOT, rule_item, policy_hits)
+
+    if rule_hits:
+        top_rule = rule_hits[0]
+        lines = [
+            f"我先按医保飞检规则库检索到：{top_rule.get('item_name') or top_rule.get('item_code')}。",
+            f"规则类型：{top_rule.get('rule_type')}；判断条件：{top_rule.get('condition_text') or '需专家确认'}。",
+        ]
+        if policy_hits:
+            lines.append(f"同时找到 {len(policy_hits)} 条政策依据片段，可在右侧政策依据区查看。")
+        lines.append("我已生成候选检索条件，仍需专家确认后才能生成 SQL 并查询数据库。")
+        intent = "rule_consultation"
+    elif policy_hits:
+        top_policy = policy_hits[0]
+        lines = [
+            f"我在政策依据库里找到了相关内容：{top_policy.get('title') or top_policy.get('document_id')}。",
+            f"摘要：{top_policy.get('content_preview', '')[:160]}",
+            "如果要继续核查，可以补充收费项目名称、医保编码或规则类型。",
+        ]
+        intent = "policy_consultation"
+    elif quick_hits:
+        top_hit = quick_hits[0]
+        lines = [
+            f"我在四类库快速查询中找到：{top_hit.get('title') or top_hit.get('id')}。",
+            f"所属库：{top_hit.get('library')}；摘要：{top_hit.get('summary') or '暂无摘要'}。",
+        ]
+        intent = "quick_lookup"
+    else:
+        lines = [
+            "我暂时没有在规则库、政策库或原始资料台账中找到明确匹配。",
+            "可以换成收费项目名称、医保编码、规则关键词，比如“重复收费”“性别限制”“年龄限制”。",
+        ]
+        intent = "clarification"
+
+    return {
+        "intent": intent,
+        "message": query,
+        "reply": "\n".join(lines),
+        "rule_hits": rule_hits,
+        "policy_hits": policy_hits,
+        "quick_results": quick_hits,
+        "generated_conditions": generated_conditions,
+        "evidence_graph": evidence_graph,
+        "actions": [
+            {"label": "解析预览", "type": "preview", "question": query},
+            {"label": "快速查询", "type": "quick_search", "query": query},
+        ],
+        "voice_supported_hint": "前端语音使用浏览器 Web Speech API；识别后仍走同一个文字聊天接口。",
+    }
 def require_date_range(payload: dict) -> tuple[str, str]:
     date_start = str(payload.get("date_start", "")).strip()
     date_end = str(payload.get("date_end", "")).strip()
@@ -536,6 +615,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "invalid json"}, status=400)
             return
         try:
+            if parsed.path == "/api/v1/assistant/chat":
+                message = str(payload.get("message", "")).strip()
+                history = payload.get("history", [])
+                if not message:
+                    self.send_json({"error": "message is required"}, status=400)
+                    return
+                self.send_json(build_assistant_reply(message, history if isinstance(history, list) else []))
+                return
             if parsed.path == "/api/v1/query/preview":
                 question = str(payload.get("question", "")).strip()
                 if not question:

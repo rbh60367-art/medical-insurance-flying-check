@@ -54,6 +54,21 @@
     .graph-legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     .legend-item { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
     .legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .chat-panel { min-height:360px; display:grid; grid-template-rows:auto minmax(180px,1fr) auto; }
+    .chat-hero { text-align:center; padding:8px 8px 4px; }
+    .chat-hero h2 { margin:0; font-size:28px; letter-spacing:0; }
+    .chat-hero .meta { margin-top:6px; }
+    .chat-suggestions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; padding:8px 0; }
+    .chat-chip { border-radius:999px; padding:8px 12px; background:#f1f5f9; color:#0f172a; font-weight:600; }
+    .chat-log { display:grid; gap:10px; align-content:start; padding:8px 0; max-height:360px; overflow:auto; }
+    .msg { max-width:86%; padding:10px 12px; border-radius:12px; font-size:13px; line-height:1.55; white-space:pre-wrap; }
+    .msg.user { justify-self:end; background:var(--blue); color:#fff; }
+    .msg.ai { justify-self:start; background:#f1f5f9; color:var(--text); border:1px solid var(--line); }
+    .chat-input { border:1px solid #93c5fd; border-radius:14px; padding:10px; background:#fff; box-shadow:0 8px 24px rgba(29,78,216,.08); }
+    .chat-input textarea { min-height:72px; border:0; padding:4px; resize:vertical; }
+    .chat-tools { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .icon-btn { width:38px; height:38px; border-radius:50%; padding:0; display:inline-flex; align-items:center; justify-content:center; font-size:18px; }
+    .voice-on { background:#fee2e2 !important; color:#b91c1c !important; }
     @media (max-width:960px) { main { grid-template-columns:1fr; } .grid { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -100,6 +115,30 @@
       </section>
     </div>
     <div class="stack">
+      <section class="chat-panel">
+        <div class="section-head"><h2>智能交流</h2><div class="meta">文字 / 语音咨询</div></div>
+        <div class="body">
+          <div class="chat-hero">
+            <h2>有什么可以帮你核查？</h2>
+            <div class="meta">可询问重复收费、性别限制、年龄限制、政策依据和医保编码。</div>
+          </div>
+          <div class="chat-suggestions">
+            <button class="chat-chip" onclick="askSuggestion('查询急诊监护费和急诊诊查费是否存在重复收费')">重复收费核查</button>
+            <button class="chat-chip" onclick="askSuggestion('阿帕他胺片是否存在性别限制违规')">性别限制</button>
+            <button class="chat-chip" onclick="askSuggestion('儿童用药有哪些年龄限制规则')">年龄限制</button>
+          </div>
+          <div class="chat-log" id="chatLog"><div class="msg ai">你好，我是医保飞检智能助手。你可以用文字或语音问我规则、政策依据、收费项目和疑点核查问题。</div></div>
+          <div class="chat-input">
+            <textarea id="chatInput" placeholder="发消息，例如：急诊监护费和急诊诊查费是否重复收费"></textarea>
+            <div class="chat-tools">
+              <button class="secondary icon-btn" id="voiceBtn" onclick="toggleVoiceInput()" title="语音输入">🎙</button>
+              <button class="secondary" onclick="copyChatToQuestion()">填入查询</button>
+              <button class="primary" id="chatSendBtn" onclick="sendChatMessage()">发送</button>
+              <span class="meta" id="voiceStatus">语音未开启</span>
+            </div>
+          </div>
+        </div>
+      </section>
       <section>
         <div class="section-head"><h2>候选规则</h2><button class="confirm" id="confirmBtn" onclick="confirmRule()" disabled>确认并生成 SQL</button></div>
         <div class="body" id="ruleHits"><div class="empty">等待解析。</div></div>
@@ -116,12 +155,68 @@
 let selectedRule = null;
 let lastConfirmPayload = null;
 let lastTaskId = null;
+let chatHistory = [];
+let recognition = null;
+let recognizing = false;
 
 function setMessage(text, isError=false){ const el=document.getElementById('message'); el.className=isError?'error':'meta'; el.textContent=text||''; }
 function fillDemo(text){ document.getElementById('question').value=text; }
 function escapeHtml(value){ return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
 async function api(path, options={}){ const res=await fetch(path,options); const data=await res.json(); if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`); return data; }
 
+function appendChat(role, text){
+  const box=document.getElementById('chatLog');
+  const div=document.createElement('div');
+  div.className=`msg ${role==='user'?'user':'ai'}`;
+  div.textContent=text;
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+function askSuggestion(text){ document.getElementById('chatInput').value=text; sendChatMessage(); }
+function copyChatToQuestion(){ const text=document.getElementById('chatInput').value.trim(); if(text) document.getElementById('question').value=text; }
+async function sendChatMessage(){
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text) return;
+  appendChat('user', text);
+  chatHistory.push({role:'user', content:text});
+  input.value='';
+  document.getElementById('chatSendBtn').disabled=true;
+  try{
+    const data=await api('/api/v1/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:chatHistory.slice(-8)})});
+    appendChat('ai', data.reply||'已收到。');
+    chatHistory.push({role:'assistant', content:data.reply||''});
+    document.getElementById('question').value=text;
+    if(data.rule_hits) renderRules(data.rule_hits);
+    if(data.policy_hits) renderPolicies(data.policy_hits);
+    if(data.evidence_graph) renderGraphPanel(data.evidence_graph);
+    if(data.quick_results) renderQuickResults({results:data.quick_results});
+    setMessage('智能助手已根据知识库返回建议。');
+  }catch(err){ appendChat('ai', err.message); setMessage(err.message,true); }
+  finally{ document.getElementById('chatSendBtn').disabled=false; }
+}
+function toggleVoiceInput(){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const status=document.getElementById('voiceStatus');
+  const btn=document.getElementById('voiceBtn');
+  if(!SpeechRecognition){ status.textContent='当前浏览器不支持语音识别'; return; }
+  if(recognizing && recognition){ recognition.stop(); return; }
+  recognition=new SpeechRecognition();
+  recognition.lang='zh-CN';
+  recognition.interimResults=true;
+  recognition.continuous=false;
+  recognizing=true;
+  btn.classList.add('voice-on');
+  status.textContent='正在听...';
+  recognition.onresult=(event)=>{
+    let text='';
+    for(let i=event.resultIndex;i<event.results.length;i++) text+=event.results[i][0].transcript;
+    document.getElementById('chatInput').value=text;
+  };
+  recognition.onerror=()=>{ status.textContent='语音识别失败，可改用文字输入'; };
+  recognition.onend=()=>{ recognizing=false; btn.classList.remove('voice-on'); status.textContent='语音已结束'; };
+  recognition.start();
+}
 function renderRules(rules){
   const box=document.getElementById('ruleHits'); selectedRule=null; document.getElementById('confirmBtn').disabled=true;
   if(!rules||!rules.length){ box.innerHTML='<div class="empty">没有匹配到候选规则。</div>'; return; }

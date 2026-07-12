@@ -486,3 +486,7 @@ GET /api/v1/evidence/graph
 - 新增关系层迁移草案 `database/migrations/005_quick_query_and_evidence_graph.sql`。
 
 当前边界：收费项目代码库仍是资产级快速查询，完整项目代码、价格、支付类别结构化是下一步。
+
+## 2026-07-12 追加：智能助手闭环
+
+已入库文字/语音交流入口、/api/v1/assistant/chat、知识库/规则库联合检索、候选检索条件 generated_conditions、专家确认后数据库检索与统计分析闭环说明。详见 docs/intelligent_assistant_pipeline.md。

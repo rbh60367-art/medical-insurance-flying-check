@@ -224,3 +224,39 @@ GET /api/v1/evidence/graph?item_rule_id=NLRI-010871
 ```
 
 返回 `nodes` 和 `edges`，当前是轻量关系层，不依赖 Neo4j。执行任务结果中也会返回 `evidence_graph` 字段。
+
+### 智能助手文字 / 语音交流
+
+```text
+POST /api/v1/assistant/chat
+```
+
+说明：语音识别在前端完成后会转成文字，进入同一个接口。该接口会检索政策知识库、规则库和四类快速查询库，并返回候选检索条件。
+
+请求：
+
+```json
+{
+  "message": "急诊监护费和急诊诊查费是否重复收费",
+  "history": []
+}
+```
+
+返回重点字段：
+
+- `reply`：助手回复；
+- `rule_hits`：命中的规则库结果；
+- `policy_hits`：命中的政策依据；
+- `quick_results`：四类库快速查询结果；
+- `generated_conditions`：待专家确认的检索条件；
+- `evidence_graph`：证据图谱。
+
+后续流程：
+
+```text
+/api/v1/assistant/chat
+  -> 专家确认 generated_conditions
+  -> /api/v1/query/confirm
+  -> /api/v1/query/execute
+  -> 统计分析 / 疑点明细 / 证据图谱
+```
