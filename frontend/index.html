@@ -12,7 +12,7 @@
     header { background:#0f172a; color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
     header h1 { margin:0; font-size:18px; }
     header .status { font-size:13px; color:#cbd5e1; }
-    main { padding:18px; display:grid; grid-template-columns:420px 1fr; gap:16px; max-width:1440px; width:100%; margin:0 auto; }
+    main { padding:18px; display:grid; grid-template-columns:560px minmax(0,1fr); gap:16px; max-width:1760px; width:100%; margin:0 auto; align-items:start; }
     section { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
     .section-head { padding:12px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .section-head h2 { margin:0; font-size:15px; }
@@ -28,7 +28,7 @@
     button.secondary { background:#e2e8f0; color:#0f172a; }
     button.confirm { background:var(--green); color:#fff; }
     button:disabled { opacity:.55; cursor:not-allowed; }
-    .stack { display:grid; gap:12px; }
+    .stack,.left-stack { display:grid; gap:12px; }
     .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#fff; }
     .card.selected { border-color:var(--green); background:var(--soft-green); }
     .title { font-weight:700; font-size:14px; margin-bottom:6px; }
@@ -43,12 +43,14 @@
     table { width:100%; border-collapse:collapse; font-size:12px; }
     .graph-card { margin-top:12px; }
     .graph-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:#f8fafc; }
-    .graph-svg { display:block; width:100%; min-width:760px; height:420px; }
-    .graph-link { stroke:#94a3b8; stroke-width:1.8; fill:none; marker-end:url(#arrow); }
-    .graph-link-label { font-size:11px; fill:#64748b; paint-order:stroke; stroke:#f8fafc; stroke-width:4px; }
+    .graph-svg { display:block; width:100%; min-width:1040px; height:820px; }
+    .graph-link { stroke:#94a3b8; stroke-width:1.6; fill:none; marker-end:url(#arrow); opacity:.9; }
+    .graph-link-label { font-size:11px; fill:#64748b; paint-order:stroke; stroke:#f8fafc; stroke-width:5px; }
     .graph-node circle { stroke:#fff; stroke-width:2.5; filter:drop-shadow(0 1px 2px rgba(15,23,42,.18)); }
     .graph-node text { font-size:12px; fill:#17202a; font-weight:700; }
     .graph-node .sub { font-size:10px; fill:#64748b; font-weight:400; }
+    .graph-lane { font-size:13px; fill:#475569; font-weight:700; }
+    .graph-lane-line { stroke:#e2e8f0; stroke-width:1; stroke-dasharray:4 6; }
     .graph-legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     .legend-item { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
     .legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
@@ -59,38 +61,44 @@
 <div class="app">
   <header><h1>医保飞检智能检索 H5 MVP</h1><div class="status" id="apiStatus">连接中...</div></header>
   <main>
-    <section>
-      <div class="section-head"><h2>新建查询</h2></div>
-      <div class="body">
-        <label for="question">专家问题</label>
-        <textarea id="question">查询急诊监护费和急诊诊查费是否存在重复收费</textarea>
-        <div class="row">
-          <div><label for="dateStart">开始日期</label><input id="dateStart" value="2025-01-01" /></div>
-          <div><label for="dateEnd">结束日期</label><input id="dateEnd" value="2026-01-01" /></div>
+    <div class="left-stack">
+      <section>
+        <div class="section-head"><h2>新建查询</h2></div>
+        <div class="body">
+          <label for="question">专家问题</label>
+          <textarea id="question">查询急诊监护费和急诊诊查费是否存在重复收费</textarea>
+          <div class="row">
+            <div><label for="dateStart">开始日期</label><input id="dateStart" value="2025-01-01" /></div>
+            <div><label for="dateEnd">结束日期</label><input id="dateEnd" value="2026-01-01" /></div>
+          </div>
+          <div class="actions">
+            <button class="primary" id="previewBtn" onclick="previewQuery()">解析预览</button>
+            <button class="secondary" onclick="fillDemo('查询阿帕他胺片是否存在性别限制违规')">性别示例</button>
+            <button class="secondary" onclick="fillDemo('查询儿童专用药品的年龄限制')">年龄示例</button>
+          </div>
+          <div id="message" style="margin-top:12px"></div>
         </div>
-        <div class="actions">
-          <button class="primary" id="previewBtn" onclick="previewQuery()">解析预览</button>
-          <button class="secondary" onclick="fillDemo('查询阿帕他胺片是否存在性别限制违规')">性别示例</button>
-          <button class="secondary" onclick="fillDemo('查询儿童专用药品的年龄限制')">年龄示例</button>
-        </div>
-        <div id="message" style="margin-top:12px"></div>
-      </div>
-    </section>
+      </section>
 
-    <section>
-      <div class="section-head"><h2>快速查询</h2></div>
-      <div class="body">
-        <label for="quickQuery">项目 / 规则 / 政策 / 原始资料</label>
-        <input id="quickQuery" value="急诊监护费" />
-        <div class="actions">
-          <button class="primary" onclick="quickSearch('all')">综合查询</button>
-          <button class="secondary" onclick="quickSearch('charge_item_catalog')">收费项目</button>
-          <button class="secondary" onclick="quickSearch('rule_item')">规则</button>
+      <section>
+        <div class="section-head"><h2>快速查询</h2></div>
+        <div class="body">
+          <label for="quickQuery">项目 / 规则 / 政策 / 原始资料</label>
+          <input id="quickQuery" value="急诊监护费" />
+          <div class="actions">
+            <button class="primary" onclick="quickSearch('all')">综合查询</button>
+            <button class="secondary" onclick="quickSearch('charge_item_catalog')">收费项目</button>
+            <button class="secondary" onclick="quickSearch('rule_item')">规则</button>
+          </div>
+          <div id="quickResults" style="margin-top:12px"><div class="empty">等待查询。</div></div>
         </div>
-        <div id="quickResults" style="margin-top:12px"><div class="empty">等待查询。</div></div>
-      </div>
-    </section>
+      </section>
 
+      <section>
+        <div class="section-head"><h2>证据图谱</h2></div>
+        <div class="body" id="graphBox"><div class="empty">解析或执行后显示证据图谱。</div></div>
+      </section>
+    </div>
     <div class="stack">
       <section>
         <div class="section-head"><h2>候选规则</h2><button class="confirm" id="confirmBtn" onclick="confirmRule()" disabled>确认并生成 SQL</button></div>
@@ -130,8 +138,8 @@ function selectRule(index){ selectedRule=window.__rules[index]; document.querySe
 
 async function previewQuery(){
   const btn=document.getElementById('previewBtn'); btn.disabled=true; setMessage('正在解析问题并检索规则/政策...');
-  document.getElementById('sqlBox').textContent='等待专家确认规则后生成。'; document.getElementById('resultBox').innerHTML='<div class="empty">等待模拟执行。</div>'; document.getElementById('mockBtn').disabled=true; document.getElementById('realBtn').disabled=true; lastConfirmPayload=null; lastTaskId=null;
-  try{ const question=document.getElementById('question').value.trim(); const data=await api('/api/v1/query/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question})}); renderRules(data.rule_hits); renderPolicies(data.policy_hits); setMessage(`候选规则类型：${(data.understanding.candidate_rule_types||[]).join(', ')||'未明确'}`); }
+  document.getElementById('sqlBox').textContent='等待专家确认规则后生成。'; document.getElementById('resultBox').innerHTML='<div class="empty">等待模拟执行。</div>'; document.getElementById('graphBox').innerHTML='<div class="empty">解析或执行后显示证据图谱。</div>'; document.getElementById('mockBtn').disabled=true; document.getElementById('realBtn').disabled=true; lastConfirmPayload=null; lastTaskId=null;
+  try{ const question=document.getElementById('question').value.trim(); const data=await api('/api/v1/query/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question})}); renderRules(data.rule_hits); renderPolicies(data.policy_hits); renderGraphPanel(data.evidence_graph); setMessage(`候选规则类型：${(data.understanding.candidate_rule_types||[]).join(', ')||'未明确'}`); }
   catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
 }
 
@@ -139,7 +147,7 @@ async function confirmRule(){
   if(!selectedRule) return; const btn=document.getElementById('confirmBtn'); btn.disabled=true; setMessage('正在生成受控 SQL...');
   try{ lastConfirmPayload={ item_rule_id:selectedRule.item_rule_id, date_start:document.getElementById('dateStart').value.trim(), date_end:document.getElementById('dateEnd').value.trim() };
     const data=await api('/api/v1/query/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lastConfirmPayload)});
-    document.getElementById('sqlBox').textContent=JSON.stringify(data,null,2); const canExecute=!!(data.sql_validation&&data.sql_validation.valid); document.getElementById('mockBtn').disabled=!canExecute; document.getElementById('realBtn').disabled=!canExecute; setMessage('已生成受控 SQL。当前仅生成，不执行。'); }
+    document.getElementById('sqlBox').textContent=JSON.stringify(data,null,2); renderGraphPanel(data.evidence_graph); const canExecute=!!(data.sql_validation&&data.sql_validation.valid); document.getElementById('mockBtn').disabled=!canExecute; document.getElementById('realBtn').disabled=!canExecute; setMessage('已生成受控 SQL。当前仅生成，不执行。'); }
   catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
 }
 
@@ -186,32 +194,35 @@ function shorten(value, max=14){
   return text.length>max ? `${text.slice(0,max-1)}…` : text;
 }
 function layoutGraph(nodes){
-  const groups=[
-    ['SourceAsset','PolicyDocument','PolicyClause'],
-    ['RuleDefinition','RuleItem'],
-    ['ChargeItem','ChargeCode'],
-    ['QueryTask','Finding']
+  const columns=[
+    { label:'来源依据', types:['SourceAsset','PolicyDocument','PolicyClause'] },
+    { label:'规则', types:['RuleDefinition','RuleItem'] },
+    { label:'收费项目', types:['ChargeItem'] },
+    { label:'医保编码', types:['ChargeCode'] },
+    { label:'任务疑点', types:['QueryTask','Finding'] }
   ];
   const positions={};
-  const width=980, height=420, gapX=260;
-  groups.forEach((types,col)=>{
-    const groupNodes=nodes.filter(n=>types.includes(n.type));
-    const step=groupNodes.length>1 ? Math.min(92,(height-130)/(groupNodes.length-1)) : 0;
-    const start=groupNodes.length>1 ? (height-step*(groupNodes.length-1))/2 : height/2;
-    groupNodes.forEach((n,i)=>{ positions[n.id]={ x:110+col*gapX, y:start+i*step }; });
+  const width=1120, height=820, gapX=225, startX=95;
+  columns.forEach((col,idx)=>{
+    const groupNodes=nodes.filter(n=>col.types.includes(n.type));
+    const step=groupNodes.length>1 ? Math.min(210,(height-260)/(groupNodes.length-1)) : 0;
+    const start=groupNodes.length>1 ? (height-step*(groupNodes.length-1))/2+40 : height/2+20;
+    groupNodes.forEach((n,i)=>{ positions[n.id]={ x:startX+idx*gapX, y:start+i*step }; });
   });
-  nodes.forEach((n,i)=>{ if(!positions[n.id]) positions[n.id]={ x:110+(i%4)*gapX, y:66+Math.floor(i/4)*82 }; });
-  return {positions,width,height};
+  nodes.forEach((n,i)=>{ if(!positions[n.id]) positions[n.id]={ x:startX+(i%5)*gapX, y:130+Math.floor(i/5)*170 }; });
+  const lanes=columns.map((col,idx)=>({ label:col.label, x:startX+idx*gapX }));
+  return {positions,width,height,lanes};
 }
 function renderEvidenceGraph(graph){
   if(!graph) return '<div class="empty">暂无依据链。</div>';
   const nodes=graph.nodes||[], edges=graph.edges||[];
   if(!nodes.length) return '<div class="empty">暂无可视化节点。</div>';
-  const {positions,width,height}=layoutGraph(nodes);
-  const edgeSvg=edges.map(e=>{
+  const {positions,width,height,lanes}=layoutGraph(nodes);
+  const laneSvg=lanes.map(l=>`<line class="graph-lane-line" x1="${l.x}" y1="70" x2="${l.x}" y2="760"></line><text class="graph-lane" x="${l.x}" y="34" text-anchor="middle">${escapeHtml(l.label)}</text>`).join('');
+  const edgeSvg=edges.map((e,i)=>{
     const s=positions[e.source], t=positions[e.target];
     if(!s||!t) return '';
-    const midX=(s.x+t.x)/2, midY=(s.y+t.y)/2-8;
+    const midX=(s.x+t.x)/2, midY=(s.y+t.y)/2-14+(i%3)*14;
     const dx=t.x-s.x, curve=Math.max(-70, Math.min(70, dx/4));
     const path=`M ${s.x} ${s.y} C ${s.x+curve} ${s.y}, ${t.x-curve} ${t.y}, ${t.x} ${t.y}`;
     return `<path class="graph-link" d="${path}"></path><text class="graph-link-label" x="${midX}" y="${midY}" text-anchor="middle">${escapeHtml(graphRelationLabel(e.relation))}</text>`;
@@ -219,12 +230,12 @@ function renderEvidenceGraph(graph){
   const nodeSvg=nodes.map(n=>{
     const p=positions[n.id], color=graphColor(n.type);
     const label=shorten(n.label||n.id, n.type==='SourceAsset'?18:14);
-    return `<g class="graph-node"><circle cx="${p.x}" cy="${p.y}" r="24" fill="${color}"></circle><text x="${p.x}" y="${p.y+43}" text-anchor="middle">${escapeHtml(label)}</text><text class="sub" x="${p.x}" y="${p.y+58}" text-anchor="middle">${escapeHtml(graphTypeLabel(n.type))}</text><title>${escapeHtml(graphTypeLabel(n.type))}：${escapeHtml(n.label||n.id)}</title></g>`;
+    return `<g class="graph-node"><circle cx="${p.x}" cy="${p.y}" r="26" fill="${color}"></circle><text x="${p.x}" y="${p.y+50}" text-anchor="middle">${escapeHtml(label)}</text><text class="sub" x="${p.x}" y="${p.y+66}" text-anchor="middle">${escapeHtml(graphTypeLabel(n.type))}</text><title>${escapeHtml(graphTypeLabel(n.type))}：${escapeHtml(n.label||n.id)}</title></g>`;
   }).join('');
   const legendTypes=[...new Set(nodes.map(n=>n.type))];
   const legend=legendTypes.map(t=>`<span class="legend-item"><span class="legend-dot" style="background:${graphColor(t)}"></span>${escapeHtml(graphTypeLabel(t))}</span>`).join('');
   const relationText=[...new Set(edges.map(e=>graphRelationLabel(e.relation)))].join('、') || '暂无';
-  return `<div class="card graph-card"><div class="title">依据链 / 证据图谱</div><div class="meta">${escapeHtml(graph.summary||'')}</div><div class="graph-wrap"><svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="医保规则证据图谱"><defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 z" fill="#94a3b8"></path></marker></defs>${edgeSvg}${nodeSvg}</svg></div><div class="graph-legend">${legend}</div><div class="meta">关系：${escapeHtml(relationText)}</div></div>`;
+  return `<div class="card graph-card"><div class="title">可视化关系图</div><div class="meta">${escapeHtml(graph.summary||'')}</div><div class="graph-wrap"><svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="医保规则证据图谱"><defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 z" fill="#94a3b8"></path></marker></defs>${laneSvg}${edgeSvg}${nodeSvg}</svg></div><div class="graph-legend">${legend}</div><div class="meta">关系：${escapeHtml(relationText)}</div></div>`;
 }
 function renderQuickResults(data){
   const box=document.getElementById('quickResults');
@@ -239,6 +250,7 @@ async function quickSearch(library){
   try{ const data=await api(`/api/v1/quick-search?query=${encodeURIComponent(query)}&library=${encodeURIComponent(library)}&limit=8`); renderQuickResults(data); setMessage('快速查询完成。'); }
   catch(err){ setMessage(err.message,true); }
 }
+function renderGraphPanel(graph){ document.getElementById('graphBox').innerHTML=renderEvidenceGraph(graph); }
 function renderResult(data){
   const s=data.summary||{}, details=data.details||[];
   lastTaskId=data.task_id||lastTaskId;
@@ -246,7 +258,8 @@ function renderResult(data){
   const months=((data.charts||{}).monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${x.amount}</div>`).join('');
   const rows=details.slice(0,10).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${r.amount}</td><td>${escapeHtml(r.reason)}</td></tr>`).join('');
   const taskActions=`<div class="actions"><button class="secondary" onclick="loadTask()">查看任务</button><button class="confirm" onclick="exportTask()">导出 CSV</button></div>`;
-  document.getElementById('resultBox').innerHTML=`<div class="grid"><div class="card"><div class="title">汇总</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">机构数：${s.institution_count||0}</div><div class="meta">患者数：${s.patient_count||0}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">明细数：${s.detail_count||0}</div><div class="meta">总金额：${s.total_amount||0}</div><div class="meta">基金相关金额：${s.fund_related_amount||0}</div>${taskActions}</div><div class="card"><div class="title">机构排名</div>${orgs||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">执行信息</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">导出：${escapeHtml(((data.export||{}).format)||'csv')}</div></div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细样例</div><div style="overflow:auto"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>${renderEvidenceGraph(data.evidence_graph)}`;
+  document.getElementById('resultBox').innerHTML=`<div class="grid"><div class="card"><div class="title">汇总</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">机构数：${s.institution_count||0}</div><div class="meta">患者数：${s.patient_count||0}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">明细数：${s.detail_count||0}</div><div class="meta">总金额：${s.total_amount||0}</div><div class="meta">基金相关金额：${s.fund_related_amount||0}</div>${taskActions}</div><div class="card"><div class="title">机构排名</div>${orgs||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">执行信息</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">导出：${escapeHtml(((data.export||{}).format)||'csv')}</div></div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细样例</div><div style="overflow:auto"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  renderGraphPanel(data.evidence_graph);
 }
 async function loadTask(){
   if(!lastTaskId) return; setMessage('正在读取任务详情...');
