@@ -43,11 +43,11 @@
     table { width:100%; border-collapse:collapse; font-size:12px; }
     .graph-card { margin-top:12px; }
     .graph-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:#f8fafc; }
-    .graph-svg { display:block; width:100%; min-width:1040px; height:820px; }
+    .graph-svg { display:block; width:100%; min-width:1120px; height:1040px; }
     .graph-link { stroke:#94a3b8; stroke-width:1.6; fill:none; marker-end:url(#arrow); opacity:.9; }
     .graph-link-label { font-size:11px; fill:#64748b; paint-order:stroke; stroke:#f8fafc; stroke-width:5px; }
     .graph-node circle { stroke:#fff; stroke-width:2.5; filter:drop-shadow(0 1px 2px rgba(15,23,42,.18)); }
-    .graph-node text { font-size:12px; fill:#17202a; font-weight:700; }
+    .graph-node text { font-size:12px; fill:#17202a; font-weight:700; dominant-baseline:middle; }
     .graph-node .sub { font-size:10px; fill:#64748b; font-weight:400; }
     .graph-lane { font-size:13px; fill:#475569; font-weight:700; }
     .graph-lane-line { stroke:#e2e8f0; stroke-width:1; stroke-dasharray:4 6; }
@@ -202,14 +202,14 @@ function layoutGraph(nodes){
     { label:'任务疑点', types:['QueryTask','Finding'] }
   ];
   const positions={};
-  const width=1120, height=820, gapX=225, startX=95;
+  const width=1240, height=1040, gapX=245, startX=72;
   columns.forEach((col,idx)=>{
     const groupNodes=nodes.filter(n=>col.types.includes(n.type));
-    const step=groupNodes.length>1 ? Math.min(210,(height-260)/(groupNodes.length-1)) : 0;
-    const start=groupNodes.length>1 ? (height-step*(groupNodes.length-1))/2+40 : height/2+20;
+    const step=groupNodes.length>1 ? Math.min(250,(height-300)/(groupNodes.length-1)) : 0;
+    const start=groupNodes.length>1 ? (height-step*(groupNodes.length-1))/2+54 : height/2+26;
     groupNodes.forEach((n,i)=>{ positions[n.id]={ x:startX+idx*gapX, y:start+i*step }; });
   });
-  nodes.forEach((n,i)=>{ if(!positions[n.id]) positions[n.id]={ x:startX+(i%5)*gapX, y:130+Math.floor(i/5)*170 }; });
+  nodes.forEach((n,i)=>{ if(!positions[n.id]) positions[n.id]={ x:startX+(i%5)*gapX, y:150+Math.floor(i/5)*210 }; });
   const lanes=columns.map((col,idx)=>({ label:col.label, x:startX+idx*gapX }));
   return {positions,width,height,lanes};
 }
@@ -218,7 +218,7 @@ function renderEvidenceGraph(graph){
   const nodes=graph.nodes||[], edges=graph.edges||[];
   if(!nodes.length) return '<div class="empty">暂无可视化节点。</div>';
   const {positions,width,height,lanes}=layoutGraph(nodes);
-  const laneSvg=lanes.map(l=>`<line class="graph-lane-line" x1="${l.x}" y1="70" x2="${l.x}" y2="760"></line><text class="graph-lane" x="${l.x}" y="34" text-anchor="middle">${escapeHtml(l.label)}</text>`).join('');
+  const laneSvg=lanes.map(l=>`<line class="graph-lane-line" x1="${l.x}" y1="74" x2="${l.x}" y2="980"></line><text class="graph-lane" x="${l.x}" y="34" text-anchor="middle">${escapeHtml(l.label)}</text>`).join('');
   const edgeSvg=edges.map((e,i)=>{
     const s=positions[e.source], t=positions[e.target];
     if(!s||!t) return '';
@@ -229,8 +229,8 @@ function renderEvidenceGraph(graph){
   }).join('');
   const nodeSvg=nodes.map(n=>{
     const p=positions[n.id], color=graphColor(n.type);
-    const label=shorten(n.label||n.id, n.type==='SourceAsset'?18:14);
-    return `<g class="graph-node"><circle cx="${p.x}" cy="${p.y}" r="26" fill="${color}"></circle><text x="${p.x}" y="${p.y+50}" text-anchor="middle">${escapeHtml(label)}</text><text class="sub" x="${p.x}" y="${p.y+66}" text-anchor="middle">${escapeHtml(graphTypeLabel(n.type))}</text><title>${escapeHtml(graphTypeLabel(n.type))}：${escapeHtml(n.label||n.id)}</title></g>`;
+    const label=shorten(n.label||n.id, n.type==='SourceAsset'?18:16);
+    return `<g class="graph-node"><circle cx="${p.x}" cy="${p.y}" r="24" fill="${color}"></circle><text x="${p.x+34}" y="${p.y-7}" text-anchor="start">${escapeHtml(label)}</text><text class="sub" x="${p.x+34}" y="${p.y+12}" text-anchor="start">${escapeHtml(graphTypeLabel(n.type))}</text><title>${escapeHtml(graphTypeLabel(n.type))}：${escapeHtml(n.label||n.id)}</title></g>`;
   }).join('');
   const legendTypes=[...new Set(nodes.map(n=>n.type))];
   const legend=legendTypes.map(t=>`<span class="legend-item"><span class="legend-dot" style="background:${graphColor(t)}"></span>${escapeHtml(graphTypeLabel(t))}</span>`).join('');
