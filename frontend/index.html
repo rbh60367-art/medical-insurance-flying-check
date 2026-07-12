@@ -219,13 +219,30 @@ function renderEvidenceGraph(graph){
   if(!nodes.length) return '<div class="empty">暂无可视化节点。</div>';
   const {positions,width,height,lanes}=layoutGraph(nodes);
   const laneSvg=lanes.map(l=>`<line class="graph-lane-line" x1="${l.x}" y1="74" x2="${l.x}" y2="980"></line><text class="graph-lane" x="${l.x}" y="34" text-anchor="middle">${escapeHtml(l.label)}</text>`).join('');
+  const relationSeen={};
   const edgeSvg=edges.map((e,i)=>{
     const s=positions[e.source], t=positions[e.target];
     if(!s||!t) return '';
-    const midX=(s.x+t.x)/2, midY=(s.y+t.y)/2-14+(i%3)*14;
-    const dx=t.x-s.x, curve=Math.max(-70, Math.min(70, dx/4));
-    const path=`M ${s.x} ${s.y} C ${s.x+curve} ${s.y}, ${t.x-curve} ${t.y}, ${t.x} ${t.y}`;
-    return `<path class="graph-link" d="${path}"></path><text class="graph-link-label" x="${midX}" y="${midY}" text-anchor="middle">${escapeHtml(graphRelationLabel(e.relation))}</text>`;
+    relationSeen[e.relation]=(relationSeen[e.relation]||0)+1;
+    const sameColumn=Math.abs(t.x-s.x)<8;
+    const relLabel=graphRelationLabel(e.relation);
+    let path, labelX, labelY, anchor='middle';
+    if(sameColumn){
+      const side=-76-(relationSeen[e.relation]%2)*28;
+      path=`M ${s.x} ${s.y} C ${s.x+side} ${s.y+40}, ${t.x+side} ${t.y-40}, ${t.x} ${t.y}`;
+      labelX=s.x+side-10;
+      labelY=(s.y+t.y)/2;
+      anchor='end';
+    }else{
+      const midX=(s.x+t.x)/2, midY=(s.y+t.y)/2-14+(i%3)*14;
+      const dx=t.x-s.x, curve=Math.max(-70, Math.min(70, dx/4));
+      path=`M ${s.x} ${s.y} C ${s.x+curve} ${s.y}, ${t.x-curve} ${t.y}, ${t.x} ${t.y}`;
+      labelX=midX;
+      labelY=midY;
+    }
+    const repeatedFinding=e.relation==='has_finding' && relationSeen[e.relation]>3;
+    const labelSvg=repeatedFinding ? '' : `<text class="graph-link-label" x="${labelX}" y="${labelY}" text-anchor="${anchor}">${escapeHtml(relLabel)}</text>`;
+    return `<path class="graph-link" d="${path}"></path>${labelSvg}`;
   }).join('');
   const nodeSvg=nodes.map(n=>{
     const p=positions[n.id], color=graphColor(n.type);
