@@ -1,0 +1,48 @@
+{
+  "version": "mvp_field_mapping_v1",
+  "tables": {
+    "settlement_main": {
+      "alias": "sm",
+      "description": "医保结算主表",
+      "fields": {
+        "setl_id": "结算流水号",
+        "mdtrt_id": "就诊流水号",
+        "fixmedins_code": "医疗机构编码",
+        "psn_no": "患者标识",
+        "gend": "性别",
+        "age": "年龄",
+        "fund_pay_sumamt": "基金支付金额",
+        "setl_time": "结算时间"
+      }
+    },
+    "fee_detail": {
+      "alias": "fd",
+      "description": "费用明细表",
+      "fields": {
+        "setl_id": "结算流水号",
+        "mdtrt_id": "就诊流水号",
+        "hilist_code": "医保项目编码",
+        "hilist_name": "医保项目名称",
+        "cnt": "数量",
+        "pric": "单价",
+        "det_item_fee_sumamt": "明细金额",
+        "fee_ocur_time": "费用发生时间"
+      }
+    }
+  },
+  "joins": [
+    {
+      "left_table": "settlement_main",
+      "left_field": "setl_id",
+      "right_table": "fee_detail",
+      "right_field": "setl_id"
+    }
+  ],
+  "required_filters": [
+    "date_start",
+    "date_end"
+  ],
+  "sensitive_fields": [
+    "psn_no"
+  ]
+}

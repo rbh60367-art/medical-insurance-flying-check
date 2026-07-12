@@ -1,0 +1,30 @@
+{
+  "settlement_main": {
+    "file": "data/claims_import/inbox/settlement_main.csv",
+    "sheet": null,
+    "columns": {
+      "setl_id": ["setl_id", "结算流水号", "结算ID", "结算单据号"],
+      "mdtrt_id": ["mdtrt_id", "就诊流水号", "就诊ID"],
+      "fixmedins_code": ["fixmedins_code", "医疗机构编码", "定点医药机构编号"],
+      "psn_no": ["psn_no", "人员编号", "患者标识", "个人编号"],
+      "gend": ["gend", "性别"],
+      "age": ["age", "年龄"],
+      "fund_pay_sumamt": ["fund_pay_sumamt", "基金支付金额", "基金支付合计"],
+      "setl_time": ["setl_time", "结算时间", "结算日期"]
+    }
+  },
+  "fee_detail": {
+    "file": "data/claims_import/inbox/fee_detail.csv",
+    "sheet": null,
+    "columns": {
+      "setl_id": ["setl_id", "结算流水号", "结算ID", "结算单据号"],
+      "mdtrt_id": ["mdtrt_id", "就诊流水号", "就诊ID"],
+      "hilist_code": ["hilist_code", "医保项目编码", "项目编码", "收费项目编码"],
+      "hilist_name": ["hilist_name", "医保项目名称", "项目名称", "收费项目名称"],
+      "cnt": ["cnt", "数量"],
+      "pric": ["pric", "单价"],
+      "det_item_fee_sumamt": ["det_item_fee_sumamt", "明细金额", "费用金额", "项目金额"],
+      "fee_ocur_time": ["fee_ocur_time", "费用发生时间", "费用日期", "发生日期"]
+    }
+  }
+}

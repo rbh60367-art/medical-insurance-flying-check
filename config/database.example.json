@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "provider": "sqlite",
+  "readonly": true,
+  "sqlite_path": "D:/path/to/readonly_medical_insurance.db",
+  "timeout_seconds": 10,
+  "max_rows": 500,
+  "notes": "Copy this file to config/database.local.json and fill a readonly database path. Do not commit real credentials."
+}

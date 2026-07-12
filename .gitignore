@@ -1,0 +1,34 @@
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime files
+backend/runtime/
+backend/*.log
+backend/api.out.log
+backend/api.err.log
+
+# Local database and private configs
+config/database.local.json
+config/*.local.json
+*.db
+*.sqlite
+*.sqlite3
+
+# Real claims data imports
+# Keep templates and mapping examples, never commit real exported settlement data.
+data/claims_import/inbox/*
+data/claims_import/output/*
+!data/claims_import/inbox/.gitkeep
+!data/claims_import/output/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temp files
+*.tmp
+*.bak

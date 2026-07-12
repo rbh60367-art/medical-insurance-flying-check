@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>医保飞检智能检索 MVP</title>
+  <style>
+    :root { --bg:#f4f6f8; --panel:#fff; --line:#d8dee6; --text:#17202a; --muted:#64748b; --blue:#1d4ed8; --green:#047857; --amber:#b45309; --red:#b91c1c; --soft-blue:#eff6ff; --soft-green:#ecfdf5; --soft-amber:#fffbeb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Microsoft YaHei",Arial,sans-serif; background:var(--bg); color:var(--text); }
+    .app { min-height:100vh; display:grid; grid-template-rows:auto 1fr; }
+    header { background:#0f172a; color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+    header h1 { margin:0; font-size:18px; }
+    header .status { font-size:13px; color:#cbd5e1; }
+    main { padding:18px; display:grid; grid-template-columns:420px 1fr; gap:16px; max-width:1440px; width:100%; margin:0 auto; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .section-head { padding:12px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .section-head h2 { margin:0; font-size:15px; }
+    .body { padding:14px; }
+    label { display:block; color:var(--muted); font-size:13px; margin-bottom:6px; }
+    textarea,input { width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:10px; font:inherit; background:#fff; }
+    textarea { min-height:132px; resize:vertical; line-height:1.55; }
+    input { height:38px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+    .actions { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    button { border:0; border-radius:6px; padding:10px 12px; font-weight:700; cursor:pointer; }
+    button.primary { background:var(--blue); color:#fff; }
+    button.secondary { background:#e2e8f0; color:#0f172a; }
+    button.confirm { background:var(--green); color:#fff; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .stack { display:grid; gap:12px; }
+    .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#fff; }
+    .card.selected { border-color:var(--green); background:var(--soft-green); }
+    .title { font-weight:700; font-size:14px; margin-bottom:6px; }
+    .meta { color:var(--muted); font-size:12px; line-height:1.55; word-break:break-all; }
+    .pill { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:12px; background:var(--soft-blue); color:var(--blue); margin-right:6px; margin-bottom:6px; }
+    .pill.warn { background:var(--soft-amber); color:var(--amber); }
+    pre { margin:0; white-space:pre-wrap; word-break:break-word; font-size:12px; line-height:1.5; background:#0f172a; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; max-height:420px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .empty { color:var(--muted); font-size:14px; padding:12px; background:#f8fafc; border-radius:8px; }
+    .error { color:var(--red); background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px; font-size:13px; }
+    th,td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    @media (max-width:960px) { main { grid-template-columns:1fr; } .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header><h1>医保飞检智能检索 H5 MVP</h1><div class="status" id="apiStatus">连接中...</div></header>
+  <main>
+    <section>
+      <div class="section-head"><h2>新建查询</h2></div>
+      <div class="body">
+        <label for="question">专家问题</label>
+        <textarea id="question">查询急诊监护费和急诊诊查费是否存在重复收费</textarea>
+        <div class="row">
+          <div><label for="dateStart">开始日期</label><input id="dateStart" value="2025-01-01" /></div>
+          <div><label for="dateEnd">结束日期</label><input id="dateEnd" value="2026-01-01" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary" id="previewBtn" onclick="previewQuery()">解析预览</button>
+          <button class="secondary" onclick="fillDemo('查询阿帕他胺片是否存在性别限制违规')">性别示例</button>
+          <button class="secondary" onclick="fillDemo('查询儿童专用药品的年龄限制')">年龄示例</button>
+        </div>
+        <div id="message" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <div class="stack">
+      <section>
+        <div class="section-head"><h2>候选规则</h2><button class="confirm" id="confirmBtn" onclick="confirmRule()" disabled>确认并生成 SQL</button></div>
+        <div class="body" id="ruleHits"><div class="empty">等待解析。</div></div>
+      </section>
+      <div class="grid">
+        <section><div class="section-head"><h2>政策依据 / RAG</h2></div><div class="body" id="policyHits"><div class="empty">等待解析。</div></div></section>
+        <section><div class="section-head"><h2>受控 SQL</h2><div class="actions" style="margin-top:0"><button class="secondary" id="realBtn" onclick="realExecute()" disabled>真实执行</button><button class="confirm" id="mockBtn" onclick="mockExecute()" disabled>模拟执行</button></div></div><div class="body"><pre id="sqlBox">等待专家确认规则后生成。</pre></div></section>
+      </div>
+      <section><div class="section-head"><h2>模拟结果</h2></div><div class="body" id="resultBox"><div class="empty">等待模拟执行。</div></div></section>
+    </div>
+  </main>
+</div>
+<script>
+let selectedRule = null;
+let lastConfirmPayload = null;
+let lastTaskId = null;
+
+function setMessage(text, isError=false){ const el=document.getElementById('message'); el.className=isError?'error':'meta'; el.textContent=text||''; }
+function fillDemo(text){ document.getElementById('question').value=text; }
+function escapeHtml(value){ return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+async function api(path, options={}){ const res=await fetch(path,options); const data=await res.json(); if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`); return data; }
+
+function renderRules(rules){
+  const box=document.getElementById('ruleHits'); selectedRule=null; document.getElementById('confirmBtn').disabled=true;
+  if(!rules||!rules.length){ box.innerHTML='<div class="empty">没有匹配到候选规则。</div>'; return; }
+  window.__rules=rules;
+  box.innerHTML=rules.map((r,i)=>`<div class="card" id="rule-${i}" onclick="selectRule(${i})"><div class="title">${escapeHtml(r.item_name||r.item_code||r.item_rule_id)}</div><div><span class="pill">${escapeHtml(r.rule_type)}</span><span class="pill warn">score ${r.score}</span></div><div class="meta">${escapeHtml(r.condition_text||'')}</div><div class="meta">编码：${escapeHtml(r.item_code||'')}</div><div class="meta">ID：${escapeHtml(r.item_rule_id||'')}</div></div>`).join('');
+  selectRule(0);
+}
+function renderPolicies(items){
+  const box=document.getElementById('policyHits');
+  if(!items||!items.length){ box.innerHTML='<div class="empty">暂无政策依据命中。</div>'; return; }
+  box.innerHTML=items.map(p=>`<div class="card"><div class="title">${escapeHtml(p.title||p.document_id)}</div><div><span class="pill">score ${p.score}</span></div><div class="meta">${escapeHtml(p.content_preview||'')}</div><div class="meta">来源：${escapeHtml((p.metadata&&p.metadata.source_file)||'')}</div></div>`).join('');
+}
+function selectRule(index){ selectedRule=window.__rules[index]; document.querySelectorAll('#ruleHits .card').forEach(el=>el.classList.remove('selected')); const el=document.getElementById(`rule-${index}`); if(el) el.classList.add('selected'); document.getElementById('confirmBtn').disabled=!selectedRule; }
+
+async function previewQuery(){
+  const btn=document.getElementById('previewBtn'); btn.disabled=true; setMessage('正在解析问题并检索规则/政策...');
+  document.getElementById('sqlBox').textContent='等待专家确认规则后生成。'; document.getElementById('resultBox').innerHTML='<div class="empty">等待模拟执行。</div>'; document.getElementById('mockBtn').disabled=true; document.getElementById('realBtn').disabled=true; lastConfirmPayload=null; lastTaskId=null;
+  try{ const question=document.getElementById('question').value.trim(); const data=await api('/api/v1/query/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question})}); renderRules(data.rule_hits); renderPolicies(data.policy_hits); setMessage(`候选规则类型：${(data.understanding.candidate_rule_types||[]).join(', ')||'未明确'}`); }
+  catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
+}
+
+async function confirmRule(){
+  if(!selectedRule) return; const btn=document.getElementById('confirmBtn'); btn.disabled=true; setMessage('正在生成受控 SQL...');
+  try{ lastConfirmPayload={ item_rule_id:selectedRule.item_rule_id, date_start:document.getElementById('dateStart').value.trim(), date_end:document.getElementById('dateEnd').value.trim() };
+    const data=await api('/api/v1/query/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lastConfirmPayload)});
+    document.getElementById('sqlBox').textContent=JSON.stringify(data,null,2); const canExecute=!!(data.sql_validation&&data.sql_validation.valid); document.getElementById('mockBtn').disabled=!canExecute; document.getElementById('realBtn').disabled=!canExecute; setMessage('已生成受控 SQL。当前仅生成，不执行。'); }
+  catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
+}
+
+function renderResult(data){
+  const s=data.summary||{}, details=data.details||[];
+  lastTaskId=data.task_id||lastTaskId;
+  const orgs=((data.charts||{}).institution_ranking||[]).map(x=>`<div class="meta">${escapeHtml(x.name)}：${x.value}</div>`).join('');
+  const months=((data.charts||{}).monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${x.amount}</div>`).join('');
+  const rows=details.slice(0,10).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${r.amount}</td><td>${escapeHtml(r.reason)}</td></tr>`).join('');
+  const taskActions=`<div class="actions"><button class="secondary" onclick="loadTask()">查看任务</button><button class="confirm" onclick="exportTask()">导出 CSV</button></div>`;
+  document.getElementById('resultBox').innerHTML=`<div class="grid"><div class="card"><div class="title">汇总</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">机构数：${s.institution_count||0}</div><div class="meta">患者数：${s.patient_count||0}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">明细数：${s.detail_count||0}</div><div class="meta">总金额：${s.total_amount||0}</div><div class="meta">基金相关金额：${s.fund_related_amount||0}</div>${taskActions}</div><div class="card"><div class="title">机构排名</div>${orgs||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">执行信息</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">导出：${escapeHtml(((data.export||{}).format)||'csv')}</div></div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细样例</div><div style="overflow:auto"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+async function loadTask(){
+  if(!lastTaskId) return; setMessage('正在读取任务详情...');
+  try{ const data=await api(`/api/v1/tasks/${encodeURIComponent(lastTaskId)}`); renderResult(data); setMessage('任务详情已刷新。'); }
+  catch(err){ setMessage(err.message,true); }
+}
+function exportTask(){
+  if(!lastTaskId) return;
+  window.open(`/api/v1/tasks/${encodeURIComponent(lastTaskId)}/export`, '_blank');
+}
+async function realExecute(){
+  if(!lastConfirmPayload) return; const btn=document.getElementById('realBtn'); btn.disabled=true; setMessage('正在调用只读数据库执行...');
+  try{ const data=await api('/api/v1/query/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lastConfirmPayload)}); renderResult(data); setMessage('真实执行完成。结果来自只读数据库连接。'); }
+  catch(err){ setMessage(err.message,true); }
+  finally{ btn.disabled=false; }
+}
+async function mockExecute(){
+  if(!lastConfirmPayload) return; const btn=document.getElementById('mockBtn'); btn.disabled=true; setMessage('正在生成模拟查询结果...');
+  try{ const data=await api('/api/v1/query/mock-execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lastConfirmPayload)}); renderResult(data); setMessage('模拟查询完成。当前使用假数据，不连接真实医保库。'); }
+  catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
+}
+
+api('/api/v1/stats').then(data=>{ document.getElementById('apiStatus').textContent=`API 在线｜规则 ${data.rule_items}｜政策片段 ${data.policy_chunks}`; }).catch(()=>{ document.getElementById('apiStatus').textContent='API 未连接'; });
+</script>
+</body>
+</html>
