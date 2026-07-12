@@ -66,6 +66,20 @@
       </div>
     </section>
 
+    <section>
+      <div class="section-head"><h2>快速查询</h2></div>
+      <div class="body">
+        <label for="quickQuery">项目 / 规则 / 政策 / 原始资料</label>
+        <input id="quickQuery" value="急诊监护费" />
+        <div class="actions">
+          <button class="primary" onclick="quickSearch('all')">综合查询</button>
+          <button class="secondary" onclick="quickSearch('charge_item_catalog')">收费项目</button>
+          <button class="secondary" onclick="quickSearch('rule_item')">规则</button>
+        </div>
+        <div id="quickResults" style="margin-top:12px"><div class="empty">等待查询。</div></div>
+      </div>
+    </section>
+
     <div class="stack">
       <section>
         <div class="section-head"><h2>候选规则</h2><button class="confirm" id="confirmBtn" onclick="confirmRule()" disabled>确认并生成 SQL</button></div>
@@ -118,6 +132,27 @@ async function confirmRule(){
   catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
 }
 
+function renderEvidenceGraph(graph){
+  if(!graph) return '<div class="empty">暂无依据链。</div>';
+  const nodes=graph.nodes||[], edges=graph.edges||[];
+  const typeCount=nodes.reduce((acc,n)=>{ acc[n.type]=(acc[n.type]||0)+1; return acc; },{});
+  const rels=[...new Set(edges.map(e=>e.relation))].slice(0,8).join('、');
+  const nodeText=Object.entries(typeCount).map(([k,v])=>`${escapeHtml(k)} ${v}`).join('｜');
+  return `<div class="card" style="margin-top:12px"><div class="title">依据链 / 证据图谱</div><div class="meta">${escapeHtml(graph.summary||'')}</div><div class="meta">实体：${nodeText||'0'}</div><div class="meta">关系：${escapeHtml(rels||'暂无')}</div></div>`;
+}
+function renderQuickResults(data){
+  const box=document.getElementById('quickResults');
+  const items=data.results||[];
+  if(!items.length){ box.innerHTML='<div class="empty">没有匹配结果。</div>'; return; }
+  box.innerHTML=items.map(r=>`<div class="card"><div class="title">${escapeHtml(r.title||r.id)}</div><div><span class="pill">${escapeHtml(r.library)}</span><span class="pill warn">score ${r.score}</span></div><div class="meta">${escapeHtml(r.summary||'')}</div><div class="meta">${escapeHtml(JSON.stringify(r.metadata||{}))}</div></div>`).join('');
+}
+async function quickSearch(library){
+  const query=document.getElementById('quickQuery').value.trim();
+  if(!query) return;
+  setMessage('正在查询四类库...');
+  try{ const data=await api(`/api/v1/quick-search?query=${encodeURIComponent(query)}&library=${encodeURIComponent(library)}&limit=8`); renderQuickResults(data); setMessage('快速查询完成。'); }
+  catch(err){ setMessage(err.message,true); }
+}
 function renderResult(data){
   const s=data.summary||{}, details=data.details||[];
   lastTaskId=data.task_id||lastTaskId;
@@ -125,7 +160,7 @@ function renderResult(data){
   const months=((data.charts||{}).monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${x.amount}</div>`).join('');
   const rows=details.slice(0,10).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${r.amount}</td><td>${escapeHtml(r.reason)}</td></tr>`).join('');
   const taskActions=`<div class="actions"><button class="secondary" onclick="loadTask()">查看任务</button><button class="confirm" onclick="exportTask()">导出 CSV</button></div>`;
-  document.getElementById('resultBox').innerHTML=`<div class="grid"><div class="card"><div class="title">汇总</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">机构数：${s.institution_count||0}</div><div class="meta">患者数：${s.patient_count||0}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">明细数：${s.detail_count||0}</div><div class="meta">总金额：${s.total_amount||0}</div><div class="meta">基金相关金额：${s.fund_related_amount||0}</div>${taskActions}</div><div class="card"><div class="title">机构排名</div>${orgs||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">执行信息</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">导出：${escapeHtml(((data.export||{}).format)||'csv')}</div></div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细样例</div><div style="overflow:auto"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  document.getElementById('resultBox').innerHTML=`<div class="grid"><div class="card"><div class="title">汇总</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">机构数：${s.institution_count||0}</div><div class="meta">患者数：${s.patient_count||0}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">明细数：${s.detail_count||0}</div><div class="meta">总金额：${s.total_amount||0}</div><div class="meta">基金相关金额：${s.fund_related_amount||0}</div>${taskActions}</div><div class="card"><div class="title">机构排名</div>${orgs||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">执行信息</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">导出：${escapeHtml(((data.export||{}).format)||'csv')}</div></div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细样例</div><div style="overflow:auto"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>${renderEvidenceGraph(data.evidence_graph)}`;
 }
 async function loadTask(){
   if(!lastTaskId) return; setMessage('正在读取任务详情...');

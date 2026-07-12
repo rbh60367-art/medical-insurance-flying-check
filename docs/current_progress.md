@@ -458,3 +458,31 @@ tests/test_claims_importer.py
 真实导出 CSV → SQLite → 只读执行器 → completed_real
 minimal tests passed
 ```
+
+## 2026-07-12 追加：快速查询库与证据图谱
+
+已按下一步方案补充第一版快速查询库和证据关系层。
+
+新增后端模块：
+
+```text
+backend/app/core/quick_query.py
+backend/app/core/evidence_graph.py
+```
+
+新增接口：
+
+```text
+GET /api/v1/quick-search
+GET /api/v1/evidence/graph
+```
+
+已接入：
+
+- `/api/v1/query/preview` 返回候选 `evidence_graph`；
+- `/api/v1/query/confirm` 返回规则证据链；
+- mock/真实执行任务结果返回含 `Finding` 的证据链；
+- H5 增加“快速查询”和“依据链 / 证据图谱”摘要；
+- 新增关系层迁移草案 `database/migrations/005_quick_query_and_evidence_graph.sql`。
+
+当前边界：收费项目代码库仍是资产级快速查询，完整项目代码、价格、支付类别结构化是下一步。

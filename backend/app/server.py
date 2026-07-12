@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 import io
@@ -14,6 +14,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.core.sql_safety import load_field_mapping, validate_sql
+from backend.app.core.evidence_graph import attach_findings_to_graph, build_rule_evidence_graph
+from backend.app.core.quick_query import quick_search
 from backend.app.core.db_executor import DatabaseNotConfiguredError, database_status, execute_readonly_query
 from backend.app.core.mock_executor import execute_mock
 CHUNKS_JSONL = ROOT / "database" / "seeds" / "policy_chunks_draft.jsonl"
@@ -296,6 +298,7 @@ def confirm_query(payload: dict) -> dict:
         raise ValueError(f"rule_type not supported for SQL generation yet: {rule_type}")
 
     validation = validate_sql(sql_result["sql"], sql_result["parameters"], FIELD_MAPPING)
+    evidence_graph = build_rule_evidence_graph(ROOT, rule_item, [])
 
     return {
         "status": "sql_generated_not_executed",
@@ -322,6 +325,7 @@ def confirm_query(payload: dict) -> dict:
             "requires_expert_confirmation": True,
             "executes_sql": False,
         },
+        "evidence_graph": evidence_graph,
     }
 
 
@@ -368,6 +372,8 @@ def get_task(task_id: str) -> dict | None:
 
 
 def build_task_payload(result, confirmed: dict) -> dict:
+    evidence_graph = confirmed.get("evidence_graph") or build_rule_evidence_graph(ROOT, confirmed["rule_item"], [])
+    evidence_graph = attach_findings_to_graph(evidence_graph, result.task_id, result.details)
     return {
         "task_id": result.task_id,
         "status": result.status,
@@ -379,6 +385,7 @@ def build_task_payload(result, confirmed: dict) -> dict:
         "sql_result": confirmed["sql_result"],
         "sql_validation": confirmed["sql_validation"],
         "rule_item": confirmed["rule_item"],
+        "evidence_graph": evidence_graph,
     }
 
 
@@ -483,6 +490,20 @@ class Handler(BaseHTTPRequestHandler):
             except DatabaseNotConfiguredError as exc:
                 self.send_json({"configured": False, "error": str(exc), "code": "database_not_configured"})
             return
+        if parsed.path == "/api/v1/quick-search":
+            query = params.get("query", [""])[0]
+            library = params.get("library", ["all"])[0]
+            limit = int(params.get("limit", ["8"])[0])
+            self.send_json(quick_search(ROOT, query, library=library, limit=limit))
+            return
+        if parsed.path == "/api/v1/evidence/graph":
+            item_rule_id = params.get("item_rule_id", [""])[0]
+            rule_item = RULE_ITEM_BY_ID.get(item_rule_id)
+            if not rule_item:
+                self.send_json({"error": "rule item not found"}, status=404)
+                return
+            self.send_json(build_rule_evidence_graph(ROOT, rule_item, []))
+            return
         if parsed.path == "/api/v1/policy/search":
             query = params.get("query", [""])[0]
             self.send_json({"query": query, "hits": search_policy(query)})
@@ -554,3 +575,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -1,4 +1,4 @@
-# 医保飞检智能检索 H5 MVP
+﻿# 医保飞检智能检索 H5 MVP
 
 这是一个医保飞检智能检索 MVP，用于演示：
 
@@ -8,6 +8,8 @@
 - SQL 安全校验
 - 模拟执行 / 样例库只读执行
 - 任务详情和 CSV 导出
+- 四类库快速查询
+- 轻量证据图谱 / 依据链
 
 > 说明：本仓库不包含真实医保结算流水。远程测试默认使用 mock 流程；如需测试“真实执行”，可生成本地样例 SQLite。
 
@@ -74,4 +76,9 @@ tests/                最小测试
 - 大模型不直接自由执行 SQL，只能走受控模板和安全校验。
 - 输出是疑点线索，不自动认定违规。
 
-更多说明：`docs/github_remote_test_guide.md`
+更多说明：
+
+- `docs/github_remote_test_guide.md`
+- `docs/quick_query_and_evidence_graph.md`
+
+

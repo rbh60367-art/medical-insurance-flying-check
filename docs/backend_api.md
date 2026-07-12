@@ -200,3 +200,27 @@ POST /api/v1/query/execute
 status = completed_real
 execution.sql_executed = true
 ```
+
+### 快速查询
+
+```text
+GET /api/v1/quick-search?query=急诊监护费&library=all&limit=8
+```
+
+`library` 支持：
+
+- `all`
+- `charge_item_catalog`
+- `rule_item`
+- `policy_document`
+- `source_asset`
+
+用于按老师要求查询四类库：收费项目代码库、规则库、政策依据库、原始资料台账库。
+
+### 证据图谱
+
+```text
+GET /api/v1/evidence/graph?item_rule_id=NLRI-010871
+```
+
+返回 `nodes` 和 `edges`，当前是轻量关系层，不依赖 Neo4j。执行任务结果中也会返回 `evidence_graph` 字段。
