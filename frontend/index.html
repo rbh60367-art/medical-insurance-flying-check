@@ -41,6 +41,17 @@
     .error { color:var(--red); background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px; font-size:13px; }
     th,td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
     table { width:100%; border-collapse:collapse; font-size:12px; }
+    .graph-card { margin-top:12px; }
+    .graph-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:#f8fafc; }
+    .graph-svg { display:block; width:100%; min-width:760px; height:420px; }
+    .graph-link { stroke:#94a3b8; stroke-width:1.8; fill:none; marker-end:url(#arrow); }
+    .graph-link-label { font-size:11px; fill:#64748b; paint-order:stroke; stroke:#f8fafc; stroke-width:4px; }
+    .graph-node circle { stroke:#fff; stroke-width:2.5; filter:drop-shadow(0 1px 2px rgba(15,23,42,.18)); }
+    .graph-node text { font-size:12px; fill:#17202a; font-weight:700; }
+    .graph-node .sub { font-size:10px; fill:#64748b; font-weight:400; }
+    .graph-legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .legend-item { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+    .legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
     @media (max-width:960px) { main { grid-template-columns:1fr; } .grid { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -132,13 +143,88 @@ async function confirmRule(){
   catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
 }
 
+function graphColor(type){
+  return ({
+    RuleItem:'#2563eb',
+    RuleDefinition:'#7c3aed',
+    ChargeItem:'#059669',
+    ChargeCode:'#0f766e',
+    SourceAsset:'#d97706',
+    PolicyDocument:'#dc2626',
+    PolicyClause:'#b91c1c',
+    QueryTask:'#475569',
+    Finding:'#e11d48'
+  })[type] || '#64748b';
+}
+function graphTypeLabel(type){
+  return ({
+    RuleItem:'规则',
+    RuleDefinition:'规则类型',
+    ChargeItem:'收费项目',
+    ChargeCode:'医保编码',
+    SourceAsset:'来源资料',
+    PolicyDocument:'政策文件',
+    PolicyClause:'政策条款',
+    QueryTask:'执行任务',
+    Finding:'疑点'
+  })[type] || type;
+}
+function graphRelationLabel(relation){
+  return ({
+    belongs_to:'属于',
+    applies_to:'关联项目',
+    has_code:'编码',
+    derived_from:'来源',
+    part_of:'属于文件',
+    mentions:'提及',
+    has_finding:'发现疑点',
+    triggered_by:'命中规则'
+  })[relation] || relation;
+}
+function shorten(value, max=14){
+  const text=String(value ?? '');
+  return text.length>max ? `${text.slice(0,max-1)}…` : text;
+}
+function layoutGraph(nodes){
+  const groups=[
+    ['SourceAsset','PolicyDocument','PolicyClause'],
+    ['RuleDefinition','RuleItem'],
+    ['ChargeItem','ChargeCode'],
+    ['QueryTask','Finding']
+  ];
+  const positions={};
+  const width=980, height=420, gapX=260;
+  groups.forEach((types,col)=>{
+    const groupNodes=nodes.filter(n=>types.includes(n.type));
+    const step=groupNodes.length>1 ? Math.min(92,(height-130)/(groupNodes.length-1)) : 0;
+    const start=groupNodes.length>1 ? (height-step*(groupNodes.length-1))/2 : height/2;
+    groupNodes.forEach((n,i)=>{ positions[n.id]={ x:110+col*gapX, y:start+i*step }; });
+  });
+  nodes.forEach((n,i)=>{ if(!positions[n.id]) positions[n.id]={ x:110+(i%4)*gapX, y:66+Math.floor(i/4)*82 }; });
+  return {positions,width,height};
+}
 function renderEvidenceGraph(graph){
   if(!graph) return '<div class="empty">暂无依据链。</div>';
   const nodes=graph.nodes||[], edges=graph.edges||[];
-  const typeCount=nodes.reduce((acc,n)=>{ acc[n.type]=(acc[n.type]||0)+1; return acc; },{});
-  const rels=[...new Set(edges.map(e=>e.relation))].slice(0,8).join('、');
-  const nodeText=Object.entries(typeCount).map(([k,v])=>`${escapeHtml(k)} ${v}`).join('｜');
-  return `<div class="card" style="margin-top:12px"><div class="title">依据链 / 证据图谱</div><div class="meta">${escapeHtml(graph.summary||'')}</div><div class="meta">实体：${nodeText||'0'}</div><div class="meta">关系：${escapeHtml(rels||'暂无')}</div></div>`;
+  if(!nodes.length) return '<div class="empty">暂无可视化节点。</div>';
+  const {positions,width,height}=layoutGraph(nodes);
+  const edgeSvg=edges.map(e=>{
+    const s=positions[e.source], t=positions[e.target];
+    if(!s||!t) return '';
+    const midX=(s.x+t.x)/2, midY=(s.y+t.y)/2-8;
+    const dx=t.x-s.x, curve=Math.max(-70, Math.min(70, dx/4));
+    const path=`M ${s.x} ${s.y} C ${s.x+curve} ${s.y}, ${t.x-curve} ${t.y}, ${t.x} ${t.y}`;
+    return `<path class="graph-link" d="${path}"></path><text class="graph-link-label" x="${midX}" y="${midY}" text-anchor="middle">${escapeHtml(graphRelationLabel(e.relation))}</text>`;
+  }).join('');
+  const nodeSvg=nodes.map(n=>{
+    const p=positions[n.id], color=graphColor(n.type);
+    const label=shorten(n.label||n.id, n.type==='SourceAsset'?18:14);
+    return `<g class="graph-node"><circle cx="${p.x}" cy="${p.y}" r="24" fill="${color}"></circle><text x="${p.x}" y="${p.y+43}" text-anchor="middle">${escapeHtml(label)}</text><text class="sub" x="${p.x}" y="${p.y+58}" text-anchor="middle">${escapeHtml(graphTypeLabel(n.type))}</text><title>${escapeHtml(graphTypeLabel(n.type))}：${escapeHtml(n.label||n.id)}</title></g>`;
+  }).join('');
+  const legendTypes=[...new Set(nodes.map(n=>n.type))];
+  const legend=legendTypes.map(t=>`<span class="legend-item"><span class="legend-dot" style="background:${graphColor(t)}"></span>${escapeHtml(graphTypeLabel(t))}</span>`).join('');
+  const relationText=[...new Set(edges.map(e=>graphRelationLabel(e.relation)))].join('、') || '暂无';
+  return `<div class="card graph-card"><div class="title">依据链 / 证据图谱</div><div class="meta">${escapeHtml(graph.summary||'')}</div><div class="graph-wrap"><svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="医保规则证据图谱"><defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 z" fill="#94a3b8"></path></marker></defs>${edgeSvg}${nodeSvg}</svg></div><div class="graph-legend">${legend}</div><div class="meta">关系：${escapeHtml(relationText)}</div></div>`;
 }
 function renderQuickResults(data){
   const box=document.getElementById('quickResults');

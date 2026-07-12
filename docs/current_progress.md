@@ -482,7 +482,7 @@ GET /api/v1/evidence/graph
 - `/api/v1/query/preview` 返回候选 `evidence_graph`；
 - `/api/v1/query/confirm` 返回规则证据链；
 - mock/真实执行任务结果返回含 `Finding` 的证据链；
-- H5 增加“快速查询”和“依据链 / 证据图谱”摘要；
+- H5 增加“快速查询”和“依据链 / 证据图谱”节点连线可视化；
 - 新增关系层迁移草案 `database/migrations/005_quick_query_and_evidence_graph.sql`。
 
 当前边界：收费项目代码库仍是资产级快速查询，完整项目代码、价格、支付类别结构化是下一步。
