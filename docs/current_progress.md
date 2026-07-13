@@ -490,3 +490,7 @@ GET /api/v1/evidence/graph
 ## 2026-07-12 追加：智能助手闭环
 
 已入库文字/语音交流入口、/api/v1/assistant/chat、知识库/规则库联合检索、候选检索条件 generated_conditions、专家确认后数据库检索与统计分析闭环说明。详见 docs/intelligent_assistant_pipeline.md。
+
+## 2026-07-13 追加：现场映射与双 Schema 测试
+
+已按收敛版架构补齐现场映射最小能力：字段推荐、规则最低字段需求矩阵、项目编码/名称匹配、SQLite 轻量探测、基于映射的重复收费查询，以及标准 Schema / 地方 Schema 双库一致性测试。详见 docs/site_mapping_and_pretest.md。

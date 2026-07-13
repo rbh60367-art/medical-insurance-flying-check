@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -17,6 +18,11 @@ from tests.test_quick_query_and_evidence import (
     test_evidence_graph_can_attach_findings,
     test_evidence_graph_links_rule_items_charge_items_and_source_assets,
     test_quick_search_returns_rule_and_asset_hits,
+)
+from tests.test_site_mapping import (
+    test_dual_schema_mapping_runs_same_duplicate_charge_result,
+    test_field_recommendation_and_project_matching,
+    test_required_field_matrix_contains_duplicate_charge_minimum,
 )
 from tests.test_sql_safety import (
     test_delete_is_rejected,
@@ -36,6 +42,10 @@ def main() -> None:
     test_quick_search_returns_rule_and_asset_hits()
     test_evidence_graph_links_rule_items_charge_items_and_source_assets()
     test_evidence_graph_can_attach_findings()
+    test_field_recommendation_and_project_matching()
+    test_required_field_matrix_contains_duplicate_charge_minimum()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dual_schema_mapping_runs_same_duplicate_charge_result(Path(tmpdir))
     test_valid_select_passes()
     test_delete_is_rejected()
     test_unknown_table_is_rejected()
