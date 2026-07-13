@@ -37,6 +37,19 @@
     .pill.warn { background:var(--soft-amber); color:var(--amber); }
     pre { margin:0; white-space:pre-wrap; word-break:break-word; font-size:12px; line-height:1.5; background:#0f172a; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; max-height:420px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .metric-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+    .metric-card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#fff; min-height:86px; }
+    .metric-card.important { border-color:#bfdbfe; background:#eff6ff; }
+    .metric-label { color:var(--muted); font-size:12px; line-height:1.4; }
+    .metric-value { margin-top:8px; font-size:24px; line-height:1; font-weight:800; color:#0f172a; }
+    .metric-unit { margin-left:4px; font-size:12px; color:var(--muted); font-weight:600; }
+    .dashboard-list { display:grid; gap:8px; }
+    .rank-row { display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:8px; align-items:center; font-size:12px; }
+    .rank-no { width:22px; height:22px; border-radius:50%; background:#e2e8f0; display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:#334155; }
+    .rank-main { min-width:0; }
+    .bar { height:8px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin-top:5px; }
+    .bar span { display:block; height:100%; background:var(--blue); border-radius:999px; }
+    .risk-tag { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:12px; font-weight:700; background:#fee2e2; color:#b91c1c; }
     .empty { color:var(--muted); font-size:14px; padding:12px; background:#f8fafc; border-radius:8px; }
     .error { color:var(--red); background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px; font-size:13px; }
     th,td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
@@ -69,7 +82,9 @@
     .chat-tools { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
     .icon-btn { width:38px; height:38px; border-radius:50%; padding:0; display:inline-flex; align-items:center; justify-content:center; font-size:18px; }
     .voice-on { background:#fee2e2 !important; color:#b91c1c !important; }
+    @media (max-width:1180px) { .metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media (max-width:960px) { main { grid-template-columns:1fr; } .grid { grid-template-columns:1fr; } }
+    @media (max-width:560px) { .metric-grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -147,7 +162,7 @@
         <section><div class="section-head"><h2>政策依据 / RAG</h2></div><div class="body" id="policyHits"><div class="empty">等待解析。</div></div></section>
         <section><div class="section-head"><h2>受控 SQL</h2><div class="actions" style="margin-top:0"><button class="secondary" id="realBtn" onclick="realExecute()" disabled>真实执行</button><button class="confirm" id="mockBtn" onclick="mockExecute()" disabled>模拟执行</button></div></div><div class="body"><pre id="sqlBox">等待专家确认规则后生成。</pre></div></section>
       </div>
-      <section><div class="section-head"><h2>模拟结果</h2></div><div class="body" id="resultBox"><div class="empty">等待模拟执行。</div></div></section>
+      <section><div class="section-head"><h2>检查看板</h2><div class="meta">关键指标 / 规则命中 / 疑点明细</div></div><div class="body" id="resultBox"><div class="empty">等待执行后生成检查看板。</div></div></section>
     </div>
   </main>
 </div>
@@ -233,7 +248,7 @@ function selectRule(index){ selectedRule=window.__rules[index]; document.querySe
 
 async function previewQuery(){
   const btn=document.getElementById('previewBtn'); btn.disabled=true; setMessage('正在解析问题并检索规则/政策...');
-  document.getElementById('sqlBox').textContent='等待专家确认规则后生成。'; document.getElementById('resultBox').innerHTML='<div class="empty">等待模拟执行。</div>'; document.getElementById('graphBox').innerHTML='<div class="empty">解析或执行后显示证据图谱。</div>'; document.getElementById('mockBtn').disabled=true; document.getElementById('realBtn').disabled=true; lastConfirmPayload=null; lastTaskId=null;
+  document.getElementById('sqlBox').textContent='等待专家确认规则后生成。'; document.getElementById('resultBox').innerHTML='<div class="empty">等待执行后生成检查看板。</div>'; document.getElementById('graphBox').innerHTML='<div class="empty">解析或执行后显示证据图谱。</div>'; document.getElementById('mockBtn').disabled=true; document.getElementById('realBtn').disabled=true; lastConfirmPayload=null; lastTaskId=null;
   try{ const question=document.getElementById('question').value.trim(); const data=await api('/api/v1/query/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question})}); renderRules(data.rule_hits); renderPolicies(data.policy_hits); renderGraphPanel(data.evidence_graph); setMessage(`候选规则类型：${(data.understanding.candidate_rule_types||[]).join(', ')||'未明确'}`); }
   catch(err){ setMessage(err.message,true); } finally{ btn.disabled=false; }
 }
@@ -363,17 +378,44 @@ async function quickSearch(library){
   catch(err){ setMessage(err.message,true); }
 }
 function renderGraphPanel(graph){ document.getElementById('graphBox').innerHTML=renderEvidenceGraph(graph); }
+function formatAmount(value){
+  const number=Number(value||0);
+  return number.toLocaleString('zh-CN',{maximumFractionDigits:2});
+}
+function normalizeRuleName(ruleType){
+  return ({
+    duplicate_charge:'重复收费',
+    gender_limit:'性别限制',
+    age_limit:'年龄限制',
+    payment_scope:'限定支付范围'
+  })[ruleType] || ruleType || '规则命中';
+}
+function renderMetric(label, value, unit='', important=false){
+  return `<div class="metric-card ${important?'important':''}"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${escapeHtml(value)}${unit?`<span class="metric-unit">${escapeHtml(unit)}</span>`:''}</div></div>`;
+}
+function renderRankList(items, valueLabel='条'){
+  if(!items.length) return '<div class="empty">暂无排名数据。</div>';
+  const max=Math.max(...items.map(x=>Number(x.value||0)),1);
+  return `<div class="dashboard-list">${items.map((x,i)=>{
+    const width=Math.max(6,Math.round(Number(x.value||0)/max*100));
+    return `<div class="rank-row"><span class="rank-no">${i+1}</span><div class="rank-main"><div class="title" style="margin:0">${escapeHtml(x.name)}</div><div class="bar"><span style="width:${width}%"></span></div></div><div class="meta">${escapeHtml(x.value)}${escapeHtml(valueLabel)}</div></div>`;
+  }).join('')}</div>`;
+}
 function renderResult(data){
   const s=data.summary||{}, details=data.details||[];
   lastTaskId=data.task_id||lastTaskId;
-  const orgs=((data.charts||{}).institution_ranking||[]).map(x=>`<div class="meta">${escapeHtml(x.name)}：${x.value}</div>`).join('');
-  const months=((data.charts||{}).monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${x.amount}</div>`).join('');
-  const rows=details.slice(0,10).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${r.amount}</td><td>${escapeHtml(r.reason)}</td></tr>`).join('');
+  const charts=data.charts||{};
+  const orgRanking=(charts.institution_ranking||[]).map(x=>({name:x.name,value:x.value}));
+  const months=(charts.monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${formatAmount(x.amount)} 元</div>`).join('');
+  const ruleName=normalizeRuleName((selectedRule||{}).rule_type);
+  const riskAmount=Number(s.fund_related_amount||s.total_amount||0);
+  const ruleRanking=[{name:ruleName,value:details.length||s.detail_count||1}];
+  const highRiskCount=orgRanking.filter(x=>Number(x.value||0)>0).length || Number(s.institution_count||0);
+  const rows=details.slice(0,12).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${formatAmount(r.amount)}</td><td><span class="risk-tag">待复核</span></td><td>${escapeHtml(r.reason)}</td></tr>`).join('');
   const taskActions=`<div class="actions"><button class="secondary" onclick="loadTask()">查看任务</button><button class="confirm" onclick="exportTask()">导出 CSV</button></div>`;
-  document.getElementById('resultBox').innerHTML=`<div class="grid"><div class="card"><div class="title">汇总</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">机构数：${s.institution_count||0}</div><div class="meta">患者数：${s.patient_count||0}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">明细数：${s.detail_count||0}</div><div class="meta">总金额：${s.total_amount||0}</div><div class="meta">基金相关金额：${s.fund_related_amount||0}</div>${taskActions}</div><div class="card"><div class="title">机构排名</div>${orgs||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无</div>'}</div><div class="card"><div class="title">执行信息</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">导出：${escapeHtml(((data.export||{}).format)||'csv')}</div></div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细样例</div><div style="overflow:auto"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  document.getElementById('resultBox').innerHTML=`<div class="metric-grid">${renderMetric('疑点明细',s.detail_count||details.length||0,'条',true)}${renderMetric('涉及金额',formatAmount(riskAmount),'元',true)}${renderMetric('涉及机构',s.institution_count||0,'家')}${renderMetric('涉及患者',s.patient_count||0,'人')}${renderMetric('高风险机构',highRiskCount,'家')}</div><div class="grid"><div class="card"><div class="title">检查任务概览</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">当前规则：${escapeHtml(ruleName)}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div>${taskActions}</div><div class="card"><div class="title">规则命中汇总</div>${renderRankList(ruleRanking,'条')}</div><div class="card"><div class="title">机构风险排名</div>${renderRankList(orgRanking,'条')}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无趋势数据。</div>'}</div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细复核</div><div class="meta">用于现场复核、确认、排除和导出。当前先展示前 12 条样例。</div><div style="overflow:auto;margin-top:8px"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>状态</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   renderGraphPanel(data.evidence_graph);
-}
-async function loadTask(){
+}async function loadTask(){
   if(!lastTaskId) return; setMessage('正在读取任务详情...');
   try{ const data=await api(`/api/v1/tasks/${encodeURIComponent(lastTaskId)}`); renderResult(data); setMessage('任务详情已刷新。'); }
   catch(err){ setMessage(err.message,true); }
