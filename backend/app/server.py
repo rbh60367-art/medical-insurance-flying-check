@@ -18,6 +18,7 @@ from backend.app.core.evidence_graph import attach_findings_to_graph, build_rule
 from backend.app.core.quick_query import quick_search
 from backend.app.core.db_executor import DatabaseNotConfiguredError, database_status, execute_readonly_query
 from backend.app.core.mock_executor import execute_mock
+from backend.app.core.site_mapping import recommend_field_mapping, required_field_matrix
 CHUNKS_JSONL = ROOT / "database" / "seeds" / "policy_chunks_draft.jsonl"
 RULE_ITEMS_JSONL = ROOT / "database" / "seeds" / "linked_priority_rule_items_draft.jsonl"
 RULE_DEFS_JSONL = ROOT / "database" / "seeds" / "national_rule_definitions_draft.jsonl"
@@ -563,6 +564,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/v1/stats":
             self.send_json({"policy_chunks": len(POLICY_CHUNKS), "rule_items": len(RULE_ITEMS), "rule_definitions": len(RULE_DEFS)})
             return
+        if parsed.path == "/api/v1/site-mapping/matrix":
+            self.send_json({"rules": required_field_matrix()})
+            return
         if parsed.path == "/api/v1/database/status":
             try:
                 self.send_json(database_status(ROOT))
@@ -622,6 +626,20 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"error": "message is required"}, status=400)
                     return
                 self.send_json(build_assistant_reply(message, history if isinstance(history, list) else []))
+                return
+            if parsed.path == "/api/v1/site-mapping/recommend":
+                columns = payload.get("columns", [])
+                if isinstance(columns, str):
+                    columns = [item.strip() for item in re.split(r"[,，\n]+", columns) if item.strip()]
+                if not isinstance(columns, list):
+                    self.send_json({"error": "columns must be a list or text"}, status=400)
+                    return
+                mapping = recommend_field_mapping([str(column).strip() for column in columns if str(column).strip()])
+                status_count = {"exact": 0, "recommended": 0, "pending": 0}
+                for row in mapping.values():
+                    status = row.get("status", "pending")
+                    status_count[status] = status_count.get(status, 0) + 1
+                self.send_json({"columns": columns, "mapping": mapping, "summary": status_count, "rules": required_field_matrix()})
                 return
             if parsed.path == "/api/v1/query/preview":
                 question = str(payload.get("question", "")).strip()

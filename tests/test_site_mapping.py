@@ -83,6 +83,12 @@ def test_field_recommendation_and_project_matching():
     rec = recommend_field_mapping(["jslsh", "xmbm", "xmmc", "sl", "je", "fssj"])
     assert rec["settlement_id"]["column"] == "jslsh"
     assert rec["item_code"]["column"] == "xmbm"
+
+    chinese_rec = recommend_field_mapping(["结算流水号", "医疗机构名称", "项目编码", "项目名称", "数量", "金额", "费用发生时间", "性别", "年龄"])
+    assert chinese_rec["settlement_id"]["column"] == "结算流水号"
+    assert chinese_rec["institution_name"]["column"] == "医疗机构名称"
+    assert chinese_rec["item_code"]["column"] == "项目编码"
+    assert chinese_rec["fee_time"]["column"] == "费用发生时间"
     matches = match_project_codes(
         [{"item_code": "001103000010000", "item_name": "急诊监护费"}],
         [{"item_code": "LOCAL001", "item_name": "急诊 监护费"}],

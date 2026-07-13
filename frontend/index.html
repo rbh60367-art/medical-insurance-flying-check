@@ -50,6 +50,13 @@
     .bar { height:8px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin-top:5px; }
     .bar span { display:block; height:100%; background:var(--blue); border-radius:999px; }
     .risk-tag { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:12px; font-weight:700; background:#fee2e2; color:#b91c1c; }
+    .risk-tag.high { background:#fee2e2; color:#b91c1c; }
+    .risk-tag.medium { background:#fffbeb; color:#b45309; }
+    .risk-tag.low { background:#ecfdf5; color:#047857; }
+    .risk-tag.status-ok { background:#ecfdf5; color:#047857; }
+    .risk-tag.status-muted { background:#f1f5f9; color:#475569; }
+    .table-actions { display:flex; gap:6px; flex-wrap:wrap; min-width:150px; }
+    button.mini { padding:5px 8px; font-size:12px; font-weight:600; }
     .empty { color:var(--muted); font-size:14px; padding:12px; background:#f8fafc; border-radius:8px; }
     .error { color:var(--red); background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px; font-size:13px; }
     th,td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
@@ -124,6 +131,18 @@
         </div>
       </section>
 
+      <section>
+        <div class="section-head"><h2>现场映射</h2><div class="meta">字段推荐 / 前期接入</div></div>
+        <div class="body">
+          <label for="siteColumns">现场表字段</label>
+          <textarea id="siteColumns">结算流水号, 就诊流水号, 医疗机构编码, 医疗机构名称, 科室名称, 项目编码, 项目名称, 单价, 数量, 金额, 费用发生时间, 性别, 年龄</textarea>
+          <div class="actions">
+            <button class="primary" onclick="recommendSiteMapping()">推荐映射</button>
+            <button class="secondary" onclick="fillSiteDemo()">现场示例</button>
+          </div>
+          <div id="siteMappingResults" style="margin-top:12px"><div class="empty">等待推荐字段映射。</div></div>
+        </div>
+      </section>
       <section>
         <div class="section-head"><h2>证据图谱</h2></div>
         <div class="body" id="graphBox"><div class="empty">解析或执行后显示证据图谱。</div></div>
@@ -377,6 +396,26 @@ async function quickSearch(library){
   try{ const data=await api(`/api/v1/quick-search?query=${encodeURIComponent(query)}&library=${encodeURIComponent(library)}&limit=8`); renderQuickResults(data); setMessage('快速查询完成。'); }
   catch(err){ setMessage(err.message,true); }
 }
+function fillSiteDemo(){
+  document.getElementById('siteColumns').value='结算流水号, 就诊流水号, 医疗机构编码, 医疗机构名称, 科室名称, 项目编码, 项目名称, 单价, 数量, 金额, 费用发生时间, 性别, 年龄';
+}
+function renderSiteMapping(data){
+  const box=document.getElementById('siteMappingResults');
+  const mapping=data.mapping||{};
+  const rows=Object.values(mapping).map(row=>`<tr><td>${escapeHtml(row.standard_field)}</td><td>${escapeHtml(row.column||'待确认')}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.reason)}</td></tr>`).join('');
+  const summary=data.summary||{};
+  box.innerHTML=`<div class="card"><div class="title">映射概览</div><div><span class="pill">精确 ${summary.exact||0}</span><span class="pill">推荐 ${summary.recommended||0}</span><span class="pill warn">待确认 ${summary.pending||0}</span></div><div class="meta">现场少量不确定字段可人工临时修改，先保证核心规则能跑通。</div></div><div class="card" style="margin-top:10px"><div class="title">字段推荐结果</div><div style="overflow:auto"><table><thead><tr><th>标准字段</th><th>现场字段</th><th>状态</th><th>说明</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+async function recommendSiteMapping(){
+  const text=document.getElementById('siteColumns').value.trim();
+  if(!text) return;
+  setMessage('正在推荐现场字段映射...');
+  try{
+    const data=await api('/api/v1/site-mapping/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns:text})});
+    renderSiteMapping(data);
+    setMessage('现场字段映射推荐完成。');
+  }catch(err){ setMessage(err.message,true); }
+}
 function renderGraphPanel(graph){ document.getElementById('graphBox').innerHTML=renderEvidenceGraph(graph); }
 function formatAmount(value){
   const number=Number(value||0);
@@ -387,8 +426,17 @@ function normalizeRuleName(ruleType){
     duplicate_charge:'重复收费',
     gender_limit:'性别限制',
     age_limit:'年龄限制',
-    payment_scope:'限定支付范围'
+    payment_scope:'限定支付范围',
+    frequency_limit:'频次限制',
+    institution_level_limit:'机构级别限制',
+    treatment_course_limit:'疗程限制',
+    indication_limit:'适应症限制'
   })[ruleType] || ruleType || '规则命中';
+}
+function riskLevelByRule(ruleType, amount){
+  if(ruleType==='duplicate_charge' || Number(amount||0)>=1000) return {label:'高风险', cls:'high'};
+  if(['gender_limit','age_limit','payment_scope','frequency_limit'].includes(ruleType)) return {label:'中风险', cls:'medium'};
+  return {label:'一般风险', cls:'low'};
 }
 function renderMetric(label, value, unit='', important=false){
   return `<div class="metric-card ${important?'important':''}"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${escapeHtml(value)}${unit?`<span class="metric-unit">${escapeHtml(unit)}</span>`:''}</div></div>`;
@@ -398,22 +446,48 @@ function renderRankList(items, valueLabel='条'){
   const max=Math.max(...items.map(x=>Number(x.value||0)),1);
   return `<div class="dashboard-list">${items.map((x,i)=>{
     const width=Math.max(6,Math.round(Number(x.value||0)/max*100));
-    return `<div class="rank-row"><span class="rank-no">${i+1}</span><div class="rank-main"><div class="title" style="margin:0">${escapeHtml(x.name)}</div><div class="bar"><span style="width:${width}%"></span></div></div><div class="meta">${escapeHtml(x.value)}${escapeHtml(valueLabel)}</div></div>`;
+    return `<div class="rank-row"><span class="rank-no">${i+1}</span><div class="rank-main"><div class="title" style="margin:0">${escapeHtml(x.name||'未命名')}</div><div class="bar"><span style="width:${width}%"></span></div></div><div class="meta">${escapeHtml(x.value)}${escapeHtml(valueLabel)}</div></div>`;
   }).join('')}</div>`;
+}
+function groupCount(items, getter){
+  const map=new Map();
+  items.forEach(item=>{
+    const key=getter(item) || '未分类';
+    map.set(key,(map.get(key)||0)+1);
+  });
+  return [...map.entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+}
+function renderRiskDistribution(items){
+  if(!items.length) return '<div class="empty">暂无风险分布。</div>';
+  const total=items.reduce((sum,item)=>sum+Number(item.value||0),0) || 1;
+  return `<div class="dashboard-list">${items.map(item=>{
+    const width=Math.max(8,Math.round(Number(item.value||0)/total*100));
+    return `<div><div class="rank-row" style="grid-template-columns:minmax(0,1fr) auto"><div class="title" style="margin:0">${escapeHtml(item.name)}</div><div class="meta">${item.value}条 / ${width}%</div></div><div class="bar"><span style="width:${width}%"></span></div></div>`;
+  }).join('')}</div>`;
+}
+function updateReviewStatus(rowNo, status){
+  const el=document.getElementById(`review-status-${rowNo}`);
+  if(el){ el.textContent=status; el.className=status==='已确认'?'risk-tag status-ok':(status==='已排除'?'risk-tag status-muted':'risk-tag'); }
+  setMessage(`第 ${rowNo} 条疑点已标记为：${status}`);
 }
 function renderResult(data){
   const s=data.summary||{}, details=data.details||[];
   lastTaskId=data.task_id||lastTaskId;
   const charts=data.charts||{};
-  const orgRanking=(charts.institution_ranking||[]).map(x=>({name:x.name,value:x.value}));
-  const months=(charts.monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${formatAmount(x.amount)} 元</div>`).join('');
-  const ruleName=normalizeRuleName((selectedRule||{}).rule_type);
+  const ruleType=(selectedRule||{}).rule_type || 'duplicate_charge';
+  const ruleName=normalizeRuleName(ruleType);
   const riskAmount=Number(s.fund_related_amount||s.total_amount||0);
-  const ruleRanking=[{name:ruleName,value:details.length||s.detail_count||1}];
+  const riskLevel=riskLevelByRule(ruleType,riskAmount);
+  const orgRanking=(charts.institution_ranking||groupCount(details,r=>r.institution_name)).map(x=>({name:x.name,value:x.value}));
+  const deptRanking=groupCount(details,r=>r.department_name || r.dept_name || '未提供科室');
+  const ruleRanking=[{name:ruleName,value:details.length||s.detail_count||1,level:riskLevel.label,amount:riskAmount}];
+  const riskDistribution=groupCount(details,()=>ruleName);
+  const months=(charts.monthly_trend||[]).slice(0,12).map(x=>`<div class="meta">${escapeHtml(x.month)}：${formatAmount(x.amount)} 元</div>`).join('');
   const highRiskCount=orgRanking.filter(x=>Number(x.value||0)>0).length || Number(s.institution_count||0);
-  const rows=details.slice(0,12).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${formatAmount(r.amount)}</td><td><span class="risk-tag">待复核</span></td><td>${escapeHtml(r.reason)}</td></tr>`).join('');
+  const ruleRows=ruleRanking.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td><span class="risk-tag ${riskLevel.cls}">${escapeHtml(r.level)}</span></td><td>${escapeHtml(r.value)}</td><td>${formatAmount(r.amount)}</td></tr>`).join('');
+  const rows=details.slice(0,12).map(r=>`<tr><td>${r.row_no}</td><td>${escapeHtml(r.institution_name)}</td><td>${escapeHtml(r.department_name||r.dept_name||'未提供')}</td><td>${escapeHtml(r.patient_id_masked)}</td><td>${escapeHtml(r.item_name)}</td><td>${formatAmount(r.amount)}</td><td><span id="review-status-${r.row_no}" class="risk-tag">待复核</span></td><td>${escapeHtml(r.reason)}</td><td><div class="table-actions"><button class="secondary mini" onclick="updateReviewStatus('${r.row_no}','已确认')">确认</button><button class="secondary mini" onclick="updateReviewStatus('${r.row_no}','已排除')">排除</button><button class="secondary mini" onclick="updateReviewStatus('${r.row_no}','待备注')">备注</button></div></td></tr>`).join('');
   const taskActions=`<div class="actions"><button class="secondary" onclick="loadTask()">查看任务</button><button class="confirm" onclick="exportTask()">导出 CSV</button></div>`;
-  document.getElementById('resultBox').innerHTML=`<div class="metric-grid">${renderMetric('疑点明细',s.detail_count||details.length||0,'条',true)}${renderMetric('涉及金额',formatAmount(riskAmount),'元',true)}${renderMetric('涉及机构',s.institution_count||0,'家')}${renderMetric('涉及患者',s.patient_count||0,'人')}${renderMetric('高风险机构',highRiskCount,'家')}</div><div class="grid"><div class="card"><div class="title">检查任务概览</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">当前规则：${escapeHtml(ruleName)}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div>${taskActions}</div><div class="card"><div class="title">规则命中汇总</div>${renderRankList(ruleRanking,'条')}</div><div class="card"><div class="title">机构风险排名</div>${renderRankList(orgRanking,'条')}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无趋势数据。</div>'}</div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细复核</div><div class="meta">用于现场复核、确认、排除和导出。当前先展示前 12 条样例。</div><div style="overflow:auto;margin-top:8px"><table><thead><tr><th>序号</th><th>机构</th><th>患者</th><th>项目</th><th>金额</th><th>状态</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  document.getElementById('resultBox').innerHTML=`<div class="metric-grid">${renderMetric('疑点明细',s.detail_count||details.length||0,'条',true)}${renderMetric('涉及金额',formatAmount(riskAmount),'元',true)}${renderMetric('涉及机构',s.institution_count||0,'家')}${renderMetric('涉及患者',s.patient_count||0,'人')}${renderMetric('高风险机构',highRiskCount,'家')}</div><div class="grid"><div class="card"><div class="title">检查任务概览</div><div class="meta">任务：${escapeHtml(data.task_id)}</div><div class="meta">当前规则：${escapeHtml(ruleName)}</div><div class="meta">风险等级：${escapeHtml(riskLevel.label)}</div><div class="meta">结算人次：${s.settlement_count||0}</div><div class="meta">SQL 执行：${String((data.execution||{}).sql_executed)}</div><div class="meta">模式：${escapeHtml((data.execution||{}).mode)}</div>${taskActions}</div><div class="card"><div class="title">规则命中汇总</div><div style="overflow:auto"><table><thead><tr><th>规则类型</th><th>等级</th><th>命中</th><th>涉及金额</th></tr></thead><tbody>${ruleRows}</tbody></table></div></div><div class="card"><div class="title">风险类型分布</div>${renderRiskDistribution(riskDistribution)}</div><div class="card"><div class="title">机构风险排名</div>${renderRankList(orgRanking,'条')}</div><div class="card"><div class="title">科室风险排名</div>${renderRankList(deptRanking,'条')}</div><div class="card"><div class="title">月度趋势</div>${months||'<div class="empty">暂无趋势数据。</div>'}</div></div><div class="card" style="margin-top:12px"><div class="title">疑点明细复核</div><div class="meta">用于现场复核、确认、排除和备注。当前先展示前 12 条样例。</div><div style="overflow:auto;margin-top:8px"><table><thead><tr><th>序号</th><th>机构</th><th>科室</th><th>患者</th><th>项目</th><th>金额</th><th>状态</th><th>原因</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   renderGraphPanel(data.evidence_graph);
 }async function loadTask(){
   if(!lastTaskId) return; setMessage('正在读取任务详情...');
