@@ -1,0 +1,78 @@
+{
+  "profile_name": "oncology_special_drug_workflow_example",
+  "description": "脱敏版肿瘤重点特药批量检索工作流模板，不包含真实服务器、密码、schema 或患者信息。",
+  "database": {
+    "type": "oracle",
+    "host": "<hospital-intranet-host>",
+    "port": 1521,
+    "service_name": "<service-name>",
+    "username": "<readonly-user>",
+    "password_policy": "password is entered manually and must not be committed",
+    "schema": "<hospital-business-schema>"
+  },
+  "core_tables": {
+    "fee_detail": "<fee-detail-main-table>",
+    "settlement": "<settlement-main-table>",
+    "encounter": "<encounter-main-table>",
+    "diagnosis": "<diagnosis-detail-table>"
+  },
+  "field_mapping": {
+    "settlement_id": "<settlement-id-column>",
+    "encounter_id": "<encounter-id-column>",
+    "patient_id": "<patient-id-column>",
+    "patient_name": "<patient-name-column-do-not-export-raw>",
+    "institution_code": "<institution-code-column>",
+    "institution_name": "<institution-name-column>",
+    "department_name": "<department-name-column>",
+    "item_code": "<national-medical-insurance-item-code-column>",
+    "item_name": "<national-medical-insurance-item-name-column>",
+    "local_item_code": "<local-item-code-column>",
+    "local_item_name": "<local-item-name-column>",
+    "quantity": "<quantity-column>",
+    "unit_price": "<unit-price-column>",
+    "amount": "<amount-column>",
+    "insurance_scope_amount": "<insurance-scope-amount-column>",
+    "fund_pay_amount": "<fund-pay-amount-column>",
+    "fee_time": "<fee-time-column>",
+    "diagnosis_code": "<diagnosis-code-column>",
+    "diagnosis_name": "<diagnosis-name-column>",
+    "main_diagnosis_flag": "<main-diagnosis-flag-column>",
+    "diagnosis_order": "<diagnosis-order-column>"
+  },
+  "drug_map_source": {
+    "source_type": "excel",
+    "drug_count_example": 33,
+    "code_count_example": 63,
+    "columns": {
+      "drug_name": "药品名称",
+      "national_codes": "国家医保编码列表"
+    }
+  },
+  "filters": {
+    "date_start": "2024-01-01",
+    "date_end_exclusive": "2026-01-01",
+    "match_mode": "national_code_exact_first_then_name_optional",
+    "exclude_refund_or_reversal": "to_be_confirmed",
+    "valid_record_only": "to_be_confirmed",
+    "settled_record_only": "to_be_confirmed",
+    "inpatient_or_outpatient_scope": "to_be_confirmed",
+    "amount_metric": "amount_and_insurance_scope_amount_both_output"
+  },
+  "primary_malignant_tumor_diagnosis_rule": {
+    "diagnosis_code_like": "C%",
+    "diagnosis_name_contains": "恶性肿瘤",
+    "diagnosis_name_excludes": ["继发"],
+    "priority": ["main_diagnosis_flag", "diagnosis_order"]
+  },
+  "outputs": {
+    "drug_summary": ["drug_name", "code_count", "detail_count", "settlement_count", "patient_count", "quantity", "amount", "insurance_scope_amount"],
+    "patient_detail": ["drug_name", "item_code", "local_item_code", "department_name", "patient_id_masked", "diagnosis_code", "diagnosis_name", "quantity", "unit_price", "amount", "insurance_scope_amount", "fee_time", "settlement_id_masked", "encounter_id_masked"],
+    "reconciliation": ["excel_amount", "database_amount", "difference_amount", "difference_rate", "possible_filter_reasons"]
+  },
+  "safety": {
+    "no_password_in_repo": true,
+    "mask_patient_identity": true,
+    "readonly_query_only": true,
+    "manual_review_required": true
+  }
+}

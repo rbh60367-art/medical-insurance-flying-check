@@ -132,6 +132,19 @@
       </section>
 
       <section>
+        <div class="section-head"><h2>真实落地经验</h2><div class="meta">数据源 / 特药批量查询</div></div>
+        <div class="body">
+          <div class="card">
+            <div class="title">业务落地点</div>
+            <div class="meta">先确认真实数据源，再做字段映射、特药清单批量检索、诊断口径过滤和 Excel 对账。</div>
+          </div>
+          <div class="actions">
+            <button class="secondary" onclick="loadOncologyWorkflow()">查看特药工作流模板</button>
+          </div>
+          <div id="oncologyWorkflowBox" style="margin-top:12px"><div class="empty">等待加载脱敏工作流模板。</div></div>
+        </div>
+      </section>
+      <section>
         <div class="section-head"><h2>现场映射</h2><div class="meta">字段推荐 / 前期接入</div></div>
         <div class="body">
           <label for="siteColumns">现场表字段</label>
@@ -395,6 +408,23 @@ async function quickSearch(library){
   setMessage('正在查询四类库...');
   try{ const data=await api(`/api/v1/quick-search?query=${encodeURIComponent(query)}&library=${encodeURIComponent(library)}&limit=8`); renderQuickResults(data); setMessage('快速查询完成。'); }
   catch(err){ setMessage(err.message,true); }
+}
+function renderOncologyWorkflow(data){
+  const box=document.getElementById('oncologyWorkflowBox');
+  const tables=data.core_tables||{};
+  const filters=data.filters||{};
+  const outputs=data.outputs||{};
+  const tableRows=Object.entries(tables).map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('');
+  const filterRows=Object.entries(filters).map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('');
+  box.innerHTML=`<div class="card"><div class="title">${escapeHtml(data.profile_name||'特药工作流模板')}</div><div class="meta">${escapeHtml(data.description||'')}</div><div><span class="pill">只读查询</span><span class="pill">患者脱敏</span><span class="pill warn">密码不入库</span></div></div><div class="card" style="margin-top:10px"><div class="title">核心表模板</div><div style="overflow:auto"><table><thead><tr><th>逻辑表</th><th>现场表占位</th></tr></thead><tbody>${tableRows}</tbody></table></div></div><div class="card" style="margin-top:10px"><div class="title">过滤口径模板</div><div style="overflow:auto"><table><thead><tr><th>口径项</th><th>默认值</th></tr></thead><tbody>${filterRows}</tbody></table></div></div><div class="card" style="margin-top:10px"><div class="title">输出结果</div><div class="meta">药品汇总：${escapeHtml((outputs.drug_summary||[]).join('、'))}</div><div class="meta">患者明细：${escapeHtml((outputs.patient_detail||[]).join('、'))}</div><div class="meta">对账结果：${escapeHtml((outputs.reconciliation||[]).join('、'))}</div></div>`;
+}
+async function loadOncologyWorkflow(){
+  setMessage('正在加载肿瘤特药工作流模板...');
+  try{
+    const data=await api('/api/v1/workflows/oncology-special-drugs/template');
+    renderOncologyWorkflow(data);
+    setMessage('已加载脱敏工作流模板。');
+  }catch(err){ setMessage(err.message,true); }
 }
 function fillSiteDemo(){
   document.getElementById('siteColumns').value='结算流水号, 就诊流水号, 医疗机构编码, 医疗机构名称, 科室名称, 项目编码, 项目名称, 单价, 数量, 金额, 费用发生时间, 性别, 年龄';

@@ -23,6 +23,7 @@ CHUNKS_JSONL = ROOT / "database" / "seeds" / "policy_chunks_draft.jsonl"
 RULE_ITEMS_JSONL = ROOT / "database" / "seeds" / "linked_priority_rule_items_draft.jsonl"
 RULE_DEFS_JSONL = ROOT / "database" / "seeds" / "national_rule_definitions_draft.jsonl"
 FIELD_MAPPING_JSON = ROOT / "config" / "field_mapping.json"
+ONCOLOGY_WORKFLOW_JSON = ROOT / "config" / "oncology_special_drug_workflow.example.json"
 FRONTEND_DIR = ROOT / "frontend"
 TASKS_JSONL = ROOT / "backend" / "runtime" / "task_runs.jsonl"
 TASK_STORE: dict[str, dict] = {}
@@ -563,6 +564,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/v1/stats":
             self.send_json({"policy_chunks": len(POLICY_CHUNKS), "rule_items": len(RULE_ITEMS), "rule_definitions": len(RULE_DEFS)})
+            return
+        if parsed.path == "/api/v1/workflows/oncology-special-drugs/template":
+            if not ONCOLOGY_WORKFLOW_JSON.exists():
+                self.send_json({"error": "workflow template not found"}, status=404)
+                return
+            self.send_json(json.loads(ONCOLOGY_WORKFLOW_JSON.read_text(encoding="utf-8")))
             return
         if parsed.path == "/api/v1/site-mapping/matrix":
             self.send_json({"rules": required_field_matrix()})
